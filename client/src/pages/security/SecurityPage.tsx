@@ -1,0 +1,679 @@
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import {
+  ShieldCheck,
+  ShieldOff,
+  Smartphone,
+  QrCode,
+  Link2,
+  Unlink,
+  Globe,
+  Monitor,
+  CheckCircle,
+  XCircle,
+  Clock,
+  KeyRound,
+  Activity,
+  Copy,
+  RefreshCcw,
+} from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { usePagination } from '@/hooks/usePagination';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import api from '@/lib/api/client';
+import { AUTH, SESSIONS, SOCIAL } from '@/lib/api/endpoints';
+import { handleApiError } from '@/lib/api/handleError';
+
+// ── Types ───────────────────────────────────────────────────
+interface LinkedAccount {
+  _id: string;
+  provider: string;
+  email: string;
+  display_name: string;
+  avatar_url?: string;
+  linked_at: string;
+}
+
+interface LoginAttempt {
+  _id: string;
+  email: string;
+  ip_address: string;
+  device: string;
+  browser: string;
+  os: string;
+  location: string;
+  success: boolean;
+  failure_reason?: string;
+  created_at: string;
+}
+
+interface SecurityEvent {
+  _id: string;
+  event_type: string;
+  description: string;
+  ip_address: string;
+  created_at: string;
+}
+
+export default function SecurityPage() {
+  useDocumentTitle('Security');
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Security</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage two-factor authentication, linked accounts, and review security activity
+        </p>
+      </div>
+
+      <Tabs defaultValue="2fa" className="w-full">
+        <TabsList className="bg-muted/50 p-1">
+          <TabsTrigger value="2fa" className="gap-2">
+            <Smartphone className="h-4 w-4" /> Two-Factor Auth
+          </TabsTrigger>
+          <TabsTrigger value="social" className="gap-2">
+            <Link2 className="h-4 w-4" /> Linked Accounts
+          </TabsTrigger>
+          <TabsTrigger value="logins" className="gap-2">
+            <Clock className="h-4 w-4" /> Login History
+          </TabsTrigger>
+          <TabsTrigger value="events" className="gap-2">
+            <Activity className="h-4 w-4" /> Security Events
+          </TabsTrigger>
+        </TabsList>
+
+        <div className="mt-6">
+          <TabsContent value="2fa">
+            <TwoFactorSection />
+          </TabsContent>
+          <TabsContent value="social">
+            <LinkedAccountsSection />
+          </TabsContent>
+          <TabsContent value="logins">
+            <LoginHistorySection />
+          </TabsContent>
+          <TabsContent value="events">
+            <SecurityEventsSection />
+          </TabsContent>
+        </div>
+      </Tabs>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 1. Two-Factor Authentication
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function TwoFactorSection() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [is2faEnabled, setIs2faEnabled] = useState(false);
+  const [setupData, setSetupData] = useState<{ secret: string; otpauth_url: string } | null>(null);
+  const [verifyToken, setVerifyToken] = useState('');
+  const [disableToken, setDisableToken] = useState('');
+  const [showDisable, setShowDisable] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  // Check current 2FA status
+  useEffect(() => {
+    api.get('/user/profile')
+      .then((res) => {
+        setIs2faEnabled(res.data.data.is_2fa_enabled ?? false);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
+
+  const handleEnable = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.post(AUTH.ENABLE_2FA);
+      setSetupData(res.data.data);
+    } catch (error) {
+      handleApiError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!verifyToken || verifyToken.length !== 6) {
+      toast.error('Enter a 6-digit code');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await api.post(AUTH.VERIFY_2FA, { token: verifyToken });
+      toast.success('Two-factor authentication enabled');
+      setIs2faEnabled(true);
+      setSetupData(null);
+      setVerifyToken('');
+    } catch (error) {
+      handleApiError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDisable = async () => {
+    if (!disableToken || disableToken.length !== 6) {
+      toast.error('Enter a 6-digit code');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await api.post(AUTH.DISABLE_2FA, { token: disableToken });
+      toast.success('Two-factor authentication disabled');
+      setIs2faEnabled(false);
+      setShowDisable(false);
+      setDisableToken('');
+    } catch (error) {
+      handleApiError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copySecret = () => {
+    if (setupData?.secret) {
+      navigator.clipboard.writeText(setupData.secret);
+      toast.success('Secret copied');
+    }
+  };
+
+  if (checking) return <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Status Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${is2faEnabled ? 'bg-green-50 dark:bg-green-900/20' : 'bg-muted'}`}>
+                {is2faEnabled
+                  ? <ShieldCheck className="h-6 w-6 text-green-600" />
+                  : <ShieldOff className="h-6 w-6 text-muted-foreground" />
+                }
+              </div>
+              <div>
+                <p className="font-medium text-foreground">
+                  Two-Factor Authentication is {is2faEnabled ? 'enabled' : 'disabled'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {is2faEnabled
+                    ? 'Your account is protected with an authenticator app'
+                    : 'Add an extra layer of security to your account'
+                  }
+                </p>
+              </div>
+            </div>
+            {is2faEnabled ? (
+              <Button variant="outline" onClick={() => setShowDisable(true)}>
+                Disable 2FA
+              </Button>
+            ) : (
+              <Button onClick={handleEnable} isLoading={isLoading && !setupData}>
+                Enable 2FA
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Setup Flow */}
+      {setupData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-primary" />
+              Set up authenticator
+            </CardTitle>
+            <CardDescription>
+              Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* QR Code */}
+            <div className="flex justify-center">
+              <div className="rounded-xl border border-border bg-white p-4">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.otpauth_url)}`}
+                  alt="2FA QR Code"
+                  className="h-[200px] w-[200px]"
+                />
+              </div>
+            </div>
+
+            {/* Manual entry */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Can't scan? Enter this key manually:
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={setupData.secret}
+                  className="font-mono text-xs bg-muted"
+                />
+                <Button variant="outline" size="icon" onClick={copySecret}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Verify */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Enter the 6-digit code from your app
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="000000"
+                  maxLength={6}
+                  value={verifyToken}
+                  onChange={(e) => setVerifyToken(e.target.value.replace(/\D/g, ''))}
+                  className="max-w-[200px] font-mono text-center text-lg tracking-widest"
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                />
+                <Button onClick={handleVerify} isLoading={isLoading}>
+                  Verify & Activate
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Disable Flow */}
+      {showDisable && (
+        <Card className="border-red-200 dark:border-red-900/50">
+          <CardHeader>
+            <CardTitle className="text-red-600">Disable Two-Factor Authentication</CardTitle>
+            <CardDescription>
+              Enter a code from your authenticator app to confirm
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input
+                placeholder="000000"
+                maxLength={6}
+                value={disableToken}
+                onChange={(e) => setDisableToken(e.target.value.replace(/\D/g, ''))}
+                className="max-w-[200px] font-mono text-center text-lg tracking-widest"
+                onKeyDown={(e) => e.key === 'Enter' && handleDisable()}
+              />
+              <Button variant="danger" onClick={handleDisable} isLoading={isLoading}>
+                Disable
+              </Button>
+              <Button variant="ghost" onClick={() => { setShowDisable(false); setDisableToken(''); }}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 2. Linked Social Accounts
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function LinkedAccountsSection() {
+  const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [unlinkProvider, setUnlinkProvider] = useState<string | null>(null);
+
+  const fetchAccounts = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(SOCIAL.LINKED_ACCOUNTS);
+      setAccounts(Array.isArray(res.data.data) ? res.data.data : []);
+    } catch (error) {
+      handleApiError(error, 'Failed to load linked accounts');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  const handleUnlink = async () => {
+    if (!unlinkProvider) return;
+    try {
+      await api.delete(SOCIAL.UNLINK(unlinkProvider));
+      toast.success(`${unlinkProvider} account unlinked`);
+      setUnlinkProvider(null);
+      fetchAccounts();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const PROVIDER_COLORS: Record<string, string> = {
+    google: 'bg-red-50 text-red-600 dark:bg-red-900/20',
+    github: 'bg-gray-50 text-gray-700 dark:bg-gray-800',
+    microsoft: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20',
+    facebook: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20',
+    apple: 'bg-gray-50 text-gray-900 dark:bg-gray-800',
+    twitter: 'bg-sky-50 text-sky-600 dark:bg-sky-900/20',
+    linkedin: 'bg-blue-50 text-blue-800 dark:bg-blue-900/20',
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Linked Social Accounts</CardTitle>
+          <CardDescription>
+            Social accounts connected to your profile for quick sign-in
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+          ) : accounts.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Link2 className="h-6 w-6 text-muted-foreground/50" />
+              </div>
+              <p className="text-sm text-muted-foreground">No social accounts linked</p>
+              <p className="text-xs text-muted-foreground">
+                Sign in with a social provider to automatically link it to your account
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {accounts.map((account) => (
+                <div
+                  key={account._id}
+                  className="flex items-center justify-between rounded-lg border border-border p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${PROVIDER_COLORS[account.provider] || 'bg-muted'}`}>
+                      {account.avatar_url ? (
+                        <img src={account.avatar_url} alt="" className="h-10 w-10 rounded-full" />
+                      ) : (
+                        <span className="text-xs font-bold uppercase">{account.provider[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground capitalize">{account.provider}</p>
+                      <p className="text-xs text-muted-foreground">{account.email || account.display_name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Linked {new Date(account.linked_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setUnlinkProvider(account.provider)}
+                    className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <Unlink className="h-3.5 w-3.5" />
+                    Unlink
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={!!unlinkProvider}
+        onClose={() => setUnlinkProvider(null)}
+        onConfirm={handleUnlink}
+        title={`Unlink ${unlinkProvider}`}
+        message={`You won't be able to sign in with ${unlinkProvider} anymore. You can re-link it later by signing in with this provider.`}
+        confirmLabel="Unlink"
+        variant="danger"
+      />
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 3. Login History
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function LoginHistorySection() {
+  const [attempts, setAttempts] = useState<LoginAttempt[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { meta, page, limit, goToPage, changeLimit, updateMeta } = usePagination();
+
+  const fetchHistory = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(SESSIONS.LOGIN_HISTORY, { params: { page, limit } });
+      const data = res.data.data;
+      setAttempts(data.attempts || []);
+      if (data.meta_data) updateMeta(data.meta_data);
+    } catch (error) {
+      handleApiError(error, 'Failed to load login history');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [page, limit]);
+
+  const columns: Column<LoginAttempt>[] = [
+    {
+      key: 'success',
+      header: 'Status',
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          {a.success ? (
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          ) : (
+            <XCircle className="h-4 w-4 text-red-500" />
+          )}
+          <span className={`text-xs font-medium ${a.success ? 'text-green-600' : 'text-red-600'}`}>
+            {a.success ? 'Success' : 'Failed'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'device',
+      header: 'Device',
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+          <div>
+            <p className="text-xs font-medium text-foreground">{a.browser || 'Unknown'} / {a.os || 'Unknown'}</p>
+            <p className="text-[10px] text-muted-foreground">{a.device || 'Unknown device'}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'ip_address',
+      header: 'IP / Location',
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+          <div>
+            <p className="font-mono text-xs">{a.ip_address}</p>
+            {a.location && <p className="text-[10px] text-muted-foreground">{a.location}</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'created_at',
+      header: 'Time',
+      render: (a) => (
+        <span className="text-xs text-muted-foreground">
+          {new Date(a.created_at).toLocaleString()}
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <div>
+          <CardTitle>Login History</CardTitle>
+          <CardDescription>Recent sign-in attempts on your account</CardDescription>
+        </div>
+        <Button variant="outline" size="icon" onClick={fetchHistory}>
+          <RefreshCcw className={isLoading ? 'animate-spin' : ''} />
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <DataTable
+          columns={columns}
+          data={attempts}
+          isLoading={isLoading}
+          meta={meta}
+          onPageChange={goToPage}
+          onLimitChange={changeLimit}
+          emptyMessage="No login attempts recorded"
+          emptyIcon={<Clock className="h-6 w-6 text-muted-foreground/50" />}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 4. Security Events Timeline
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function SecurityEventsSection() {
+  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { meta, page, limit, goToPage, updateMeta } = usePagination();
+
+  const fetchEvents = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(SESSIONS.SECURITY_EVENTS, { params: { page, limit } });
+      const data = res.data.data;
+      setEvents(data.events || []);
+      if (data.meta_data) updateMeta(data.meta_data);
+    } catch (error) {
+      handleApiError(error, 'Failed to load security events');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, [page, limit]);
+
+  const EVENT_ICONS: Record<string, { icon: React.ReactNode; color: string }> = {
+    password_reset: { icon: <KeyRound className="h-4 w-4" />, color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20' },
+    password_changed: { icon: <KeyRound className="h-4 w-4" />, color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20' },
+    '2fa_enabled': { icon: <ShieldCheck className="h-4 w-4" />, color: 'bg-green-50 text-green-600 dark:bg-green-900/20' },
+    '2fa_disabled': { icon: <ShieldOff className="h-4 w-4" />, color: 'bg-red-50 text-red-600 dark:bg-red-900/20' },
+    account_recovered: { icon: <CheckCircle className="h-4 w-4" />, color: 'bg-green-50 text-green-600 dark:bg-green-900/20' },
+    admin_impersonation: { icon: <Activity className="h-4 w-4" />, color: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20' },
+  };
+
+  const getEventMeta = (type: string) => {
+    return EVENT_ICONS[type] || { icon: <Activity className="h-4 w-4" />, color: 'bg-muted text-muted-foreground' };
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <div>
+          <CardTitle>Security Events</CardTitle>
+          <CardDescription>Password changes, 2FA toggles, and other security-related activity</CardDescription>
+        </div>
+        <Button variant="outline" size="icon" onClick={fetchEvents}>
+          <RefreshCcw className={isLoading ? 'animate-spin' : ''} />
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+        ) : events.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Activity className="h-6 w-6 text-muted-foreground/50" />
+            </div>
+            <p className="text-sm text-muted-foreground">No security events recorded</p>
+          </div>
+        ) : (
+          <div className="space-y-0">
+            {events.map((event, idx) => {
+              const eventMeta = getEventMeta(event.event_type);
+              return (
+                <div key={event._id} className="relative flex gap-4 pb-6 last:pb-0">
+                  {/* Timeline line */}
+                  {idx < events.length - 1 && (
+                    <div className="absolute left-5 top-10 bottom-0 w-px bg-border" />
+                  )}
+
+                  {/* Icon */}
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${eventMeta.color}`}>
+                    {eventMeta.icon}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 pt-1">
+                    <p className="text-sm font-medium text-foreground">{event.description}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                        {event.event_type}
+                      </span>
+                      {event.ip_address && (
+                        <span className="flex items-center gap-1">
+                          <Globe className="h-3 w-3" /> {event.ip_address}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {new Date(event.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Pagination */}
+            {meta && meta.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-4 pt-4 border-t border-border mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => goToPage(page - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Page {meta.page} of {meta.total_pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= meta.total_pages}
+                  onClick={() => goToPage(page + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
