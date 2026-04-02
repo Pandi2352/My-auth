@@ -42,6 +42,7 @@ const AdvertisementsPage = lazy(() => import('./pages/advertisements/Advertiseme
 const CustomFieldsPage = lazy(() => import('./pages/custom-fields/CustomFieldsPage'));
 const SystemLogsPage = lazy(() => import('./pages/system-logs/SystemLogsPage'));
 const PermissionMatrixPage = lazy(() => import('./pages/admin/PermissionMatrixPage'));
+const SystemHealthPage = lazy(() => import('./pages/admin/SystemHealthPage'));
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'));
 
@@ -97,6 +98,7 @@ function App() {
             <Route path="/advertisements" element={<AdvertisementsPage />} />
             <Route path="/custom-fields" element={<CustomFieldsPage />} />
             <Route path="/system-logs" element={<SystemLogsPage />} />
+            <Route path="/admin/system/health" element={<SystemHealthPage />} />
             <Route path="/admin/permissions/matrix" element={<PermissionMatrixPage />} />
             <Route path="/connectors" element={<ConnectorsListPage />} />
             <Route path="/settings" element={<SettingsPage />} />

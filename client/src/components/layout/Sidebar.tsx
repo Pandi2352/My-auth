@@ -23,6 +23,7 @@ import {
   ListChecks,
   FileText,
   Layers,
+  Activity,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ElementType> = {
@@ -42,6 +43,7 @@ const iconMap: Record<string, React.ElementType> = {
   ListChecks,
   FileText,
   Layers,
+  Activity,
 };
 
 interface NavSection {
@@ -79,6 +81,7 @@ const navSections: NavSection[] = [
   {
     label: 'System',
     items: [
+      { label: 'Health', path: '/admin/system/health', icon: 'Activity', permission: 'settings:read' },
       { label: 'Ads', path: '/advertisements', icon: 'Megaphone', permission: 'advertisement:read' },
       { label: 'Custom Fields', path: '/custom-fields', icon: 'ListChecks', permission: 'settings:read' },
       { label: 'Connectors', path: '/connectors', icon: 'Link2', permission: 'connector:read' },

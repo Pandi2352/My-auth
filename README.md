@@ -24,39 +24,33 @@ A production-ready, full-stack user management boilerplate built with **NestJS 1
 - **Responsive "Deep Night" Architecture** — adaptive sidebar drawer for mobile/tablet viewports
 - **Surgical Metadata** — high-density UI with absolute borders and zero shadow policy for professional engineering scanning
 
+### Audit & System Health
+- **Surgical Real-time Health Dashboard** — live telemetry of server internals via WebSockets
+- **Performance Monitoring** — real-time visualization of CPU usage, Memory (Heap/RSS), and Event Loop Lag
+- **Live Traffic Intelligence** — Requests Per Second (RPS) and surgical Latency (ms) tracking across all endpoints
+- **Comprehensive audit logging** — action, method, endpoint, status code, IP, user agent
+- **System Logs Viewer** — direct access to combined/error application logs from the dashboard
+
+### Analytics & Reporting
+- **Analytics dashboard** — user growth (area chart), login activity, role distribution, and churn prediction
+- **Export capabilities** — export analytics as JSON, export audit logs as JSON or CSV
+- **Visual Performance Profiles** — dual-axis historical charts for server load and traffic throughput
+
 ### Social Login (OAuth2)
 - Social connector CRUD (Google, GitHub, Microsoft, Facebook, Apple, Twitter, LinkedIn, Custom)
 - Full OAuth2 callback flow — auto-creates user, issues JWT, redirects to dashboard
 - **Linked social accounts UI** — view/unlink social accounts on the Security page
-- Custom provider support with manual OAuth URL configuration
 
 ### User Management (Admin)
 - Full CRUD for users, roles, permissions, and groups
 - Role-based access control (RBAC) with granular permissions (`module:action` format)
 - **Custom user fields** — admin-defined extra profile fields with dynamic form rendering
 - User invitations with email delivery and token validation
-- Soft/hard delete with account recovery (30-day window)
-- Bulk role assignment, status management (active, pending, suspended, locked)
-
-### Audit & Analytics
-- Comprehensive audit logging (action, method, endpoint, status code, IP, user agent)
-- **Analytics dashboard** — user growth (area chart), login activity, role distribution, and churn prediction
-- Export analytics as JSON, export audit logs as JSON or CSV
-
-### Advertisement System
-- Full CRUD for advertisements with 6 designated placement positions
-- Image banners, HTML content, and Script-based ad support
-- Impression and click tracking with CTR analytics
 
 ### System Configuration
 - Key-value settings organized by category: **App**, **Auth**, **Email**, **Security**
 - **Dynamic branding** — site name and logo URL reflected in sidebar, auth pages, and browser title
 - **Announcement Banner** — admin-configurable site-wide message bar at the top of the dashboard
-
-### Real-time Connectivity
-- **WebSocket gateway** (Socket.IO) for instant in-app notifications
-- **Bell icon** in topbar with unread count badge and real-time refresh
-- **Structured Logging** — Winston logger with log rotation and admin log viewer (`/system-logs`)
 
 ## Tech Stack
 
@@ -67,10 +61,8 @@ A production-ready, full-stack user management boilerplate built with **NestJS 1
 | Auth | Passport.js (JWT + Local), bcrypt, speakeasy (TOTP) |
 | Frontend | React 19, Vite 8, TypeScript 5 |
 | Styling | Tailwind CSS 4 (`@tailwindcss/vite`) |
-| State | Zustand 5 with persist middleware |
-| Forms | React Hook Form + Zod |
 | Charts | Recharts (Area, Bar, Pie, Line) |
-| Real-time | Socket.IO (WebSocket gateway for notifications) |
+| Real-time | Socket.IO (Self-hosted telemetry gateway) |
 | WebAuthn | @simplewebauthn/server, @simplewebauthn/browser |
 | Logging | Winston (console + file with rotation) |
 | API Docs | Swagger/OpenAPI via `@nestjs/swagger` |
@@ -81,24 +73,24 @@ A production-ready, full-stack user management boilerplate built with **NestJS 1
 nestjs-mongodb-setup-utils/
 ├── server/                        # NestJS backend
 │   ├── src/
-│   │   ├── common/                # Guards, decorators, enums, constants
-│   │   ├── config/                # Database, JWT, Seeding logic
+│   │   ├── common/                # Guards, decorators, common interceptors
 │   │   ├── modules/
-│   │   │   ├── admin/             # User management, session auditing, 2FA reset
+│   │   │   ├── admin/             # User management, System Health, Permission Matrix
 │   │   │   ├── auth/              # Authentication, impersonation, WebAuthn
 │   │   │   ├── analytics/         # User & login metrics
-│   │   │   ├── session/           # Active session persistence & event logging
 │   │   │   └── system-config/     # Dynamic application settings
 │   │   └── utils/                 # UserAgent parsing, Bcrypt, TOTP helpers
 │
 ├── client/                        # React frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── layout/            # Responsive Sidebar (Drawer) & Topbar
-│   │   │   └── ui/                # High-density surgical components
+│   │   │   ├── layout/            # Responsive Sidebar & Topbar
+│   │   │   └── ui/                # Surgical components & Command Palette
 │   │   ├── hooks/                 # useAppSettings, useSidebar, usePermissions
-│   │   ├── pages/                 # UI Modules (Settings, Users, Analytics, etc.)
-│   │   └── stores/                # Zustand (Auth, Sidebar stores)
+│   │   ├── pages/
+│   │   │   ├── admin/             # System Health, Permission Matrix
+│   │   │   └── users/             # User Management & Session Auditing
+│   │   └── stores/                # Zustand stores
 ```
 
 ## Getting Started
@@ -130,7 +122,7 @@ npm run dev
 ### 2. Default Credentials
 
 The system seeds a super administrator on first run:
-- **Email:** `dev@example.com` / `superadmin@example.com`
+- **Email:** `superadmin@example.com`
 - **Password:** `DevPassword123!`
 - **Role:** `super_admin`
 
@@ -140,7 +132,7 @@ The system seeds a super administrator on first run:
 |--------|-----------|-------------|
 | Auth | `/auth` | Login, 2FA, Passkeys, Recovery, Impersonation |
 | Admin | `/admin/users` | User CRUD, session termination, 2FA resets |
-| Sessions | `/sessions` | Global session tracking & remote logout |
+| Health | `/health` (WS) | Real-time system telemetry broadcasting |
 | Analytics | `/admin/analytics` | System-wide performance and growth charts |
 | Audit | `/admin/audit-logs` | Transactional activity logging |
 | Settings | `/admin/settings` | Dynamic branding and security configuration |
