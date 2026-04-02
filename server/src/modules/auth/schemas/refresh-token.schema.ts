@@ -3,7 +3,7 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type RefreshTokenDocument = HydratedDocument<RefreshToken>;
 
-@Schema({ timestamps: { createdAt: 'created_at', updatedAt: false } })
+@Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'last_activity' } })
 export class RefreshToken {
     @Prop({ type: Types.ObjectId, ref: 'User', required: true })
     user_id: Types.ObjectId;
@@ -15,10 +15,19 @@ export class RefreshToken {
     device: string;
 
     @Prop()
+    browser: string;
+
+    @Prop()
+    os: string;
+
+    @Prop()
     ip_address: string;
 
     @Prop()
     user_agent: string;
+
+    @Prop()
+    location: string;
 
     @Prop({ default: false })
     is_revoked: boolean;
@@ -27,6 +36,9 @@ export class RefreshToken {
     expires_at: Date;
 
     created_at: Date;
+
+    @Prop()
+    last_activity: Date;
 }
 
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);

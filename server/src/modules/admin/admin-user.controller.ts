@@ -160,4 +160,30 @@ export class AdminUserController {
     bulkDelete(@Body() dto: { user_ids: string[]; soft?: boolean }) {
         return this.adminUserService.bulkDelete(dto.user_ids, dto.soft);
     }
+
+    // ── Session Management ───────────────────────────────────
+
+    @Get(':id/sessions')
+    @Permissions('session:read')
+    @ApiOperation({ summary: 'List user sessions (admin)' })
+    getUserSessions(@Param('id') userId: string) {
+        return this.adminUserService.getUserSessions(userId);
+    }
+
+    @Delete(':userId/sessions/:sessionId')
+    @Permissions('session:delete')
+    @ApiOperation({ summary: 'Terminate user session (admin)' })
+    terminateUserSession(
+        @Param('userId') userId: string,
+        @Param('sessionId') sessionId: string,
+    ) {
+        return this.adminUserService.terminateUserSession(userId, sessionId);
+    }
+
+    @Post(':id/2fa/reset')
+    @Permissions('user:update')
+    @ApiOperation({ summary: 'Reset/Disable user 2FA (admin)' })
+    resetUser2FA(@Param('id') userId: string) {
+        return this.adminUserService.resetUser2FA(userId);
+    }
 }

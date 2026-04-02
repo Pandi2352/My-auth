@@ -91,7 +91,7 @@ const navSections: NavSection[] = [
 import { useSidebar } from '@/contexts/SidebarContext';
 
 export function Sidebar() {
-  const { collapsed } = useSidebar();
+  const { collapsed, isMobile, isMobileOpen, closeMobile } = useSidebar();
   const { can } = usePermissions();
   const { favorites, toggle: toggleFav, isFavorite } = useFavorites();
   const { siteName, logoUrl } = useAppSettings();
@@ -111,96 +111,110 @@ export function Sidebar() {
     .filter((section) => section.items.length > 0);
 
   return (
-    <aside
-      className={cn(
-        'fixed inset-y-0 left-0 z-30 flex flex-col border-r border-border bg-slate-50 dark:bg-zinc-950 transition-[width] duration-100 ease-linear',
-        collapsed ? 'w-16' : 'w-64',
+    <>
+      {/* Mobile Backdrop */}
+      {isMobile && isMobileOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-zinc-950/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={closeMobile}
+        />
       )}
-    >
-      {/* Logo */}
-      <div className="flex h-14 shrink-0 items-center border-b border-border px-3">
-        {collapsed ? (
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white overflow-hidden">
-            {logoUrl ? (
-              <img src={logoUrl} alt={siteName} className="h-9 w-9 object-cover" />
-            ) : (
-              <Hexagon className="h-5 w-5" />
-            )}
-          </div>
-        ) : (
-          <div className="flex w-full items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white overflow-hidden">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={siteName} className="h-8 w-8 object-cover" />
-                ) : (
-                  <Hexagon className="h-4 w-4" />
-                )}
-              </div>
-              <span className="text-sm font-bold text-foreground tracking-tight">{siteName}</span>
+
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-slate-50 dark:bg-zinc-950 transition-all duration-300 ease-in-out',
+          isMobile 
+            ? (isMobileOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]') 
+            : (collapsed ? 'w-16' : 'w-64'),
+        )}
+      >
+        {/* Logo */}
+        <div className="flex h-14 shrink-0 items-center border-b border-border px-3">
+          {(collapsed && !isMobile) ? (
+            <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt={siteName} className="h-9 w-9 object-cover" />
+              ) : (
+                <Hexagon className="h-5 w-5" />
+              )}
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Nav sections */}
-      <nav className="flex-1 overflow-y-auto py-3 custom-sidebar-scrollbar px-2">
-        {/* Favorites section */}
-        {favoriteItems.length > 0 && (
-          <div className="mb-3">
-            {!collapsed && (
-              <p className="mb-1.5 mt-2 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-amber-600/60 dark:text-amber-500/50">
-                Favorites
-              </p>
-            )}
-            {collapsed && (
-              <div className="mx-3 mb-2 flex justify-center">
-                <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+          ) : (
+            <div className="flex w-full items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={siteName} className="h-8 w-8 object-cover" />
+                  ) : (
+                    <Hexagon className="h-4 w-4" />
+                  )}
+                </div>
+                <span className="text-sm font-bold text-foreground tracking-tight">{siteName}</span>
               </div>
-            )}
-            <ul className="space-y-0.5 px-2">
-              {favoriteItems.map((item) => (
-                <SidebarNavItem
-                  key={`fav-${item.path}`}
-                  item={item}
-                  collapsed={collapsed}
-                  isFavorite
-                  onToggleFavorite={toggleFav}
-                />
-              ))}
-            </ul>
-            {!collapsed && <div className="mx-4 mt-3 border-t border-border" />}
-            {collapsed && <div className="mx-3 mt-2 border-t border-border" />}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
-        {/* Regular sections */}
-        {filteredSections.map((section, sectionIdx) => (
-          <div key={section.label} className={sectionIdx > 0 || favoriteItems.length > 0 ? 'mt-3' : ''}>
-            {!collapsed && (
-              <p className="mb-0.5 mt-3 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50">
-                {section.label}
-              </p>
-            )}
-            {collapsed && sectionIdx > 0 && (
-              <div className="mx-3 mb-2 border-t border-border" />
-            )}
+        {/* Nav sections */}
+        <nav className="flex-1 overflow-y-auto py-3 custom-sidebar-scrollbar px-2">
+          {/* Favorites section */}
+          {favoriteItems.length > 0 && (
+            <div className="mb-3">
+              {!(collapsed && !isMobile) && (
+                <p className="mb-1.5 mt-2 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-amber-600/60 dark:text-amber-500/50">
+                  Favorites
+                </p>
+              )}
+              {(collapsed && !isMobile) && (
+                <div className="mx-3 mb-2 flex justify-center">
+                  <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                </div>
+              )}
+              <ul className="space-y-0.5 px-2">
+                {favoriteItems.map((item) => (
+                  <SidebarNavItem
+                    key={`fav-${item.path}`}
+                    item={item}
+                    collapsed={collapsed && !isMobile}
+                    isFavorite
+                    onToggleFavorite={toggleFav}
+                    onClick={closeMobile}
+                  />
+                ))}
+              </ul>
+              {!(collapsed && !isMobile) && <div className="mx-4 mt-3 border-t border-border" />}
+              {(collapsed && !isMobile) && <div className="mx-3 mt-2 border-t border-border" />}
+            </div>
+          )}
 
-            <ul className="space-y-0.5 px-2">
-              {section.items.map((item) => (
-                <SidebarNavItem
-                  key={item.path}
-                  item={item}
-                  collapsed={collapsed}
-                  isFavorite={isFavorite(item.path)}
-                  onToggleFavorite={toggleFav}
-                />
-              ))}
-            </ul>
-          </div>
-        ))}
-      </nav>
-    </aside>
+          {/* Regular sections */}
+          {filteredSections.map((section, sectionIdx) => (
+            <div key={section.label} className={sectionIdx > 0 || favoriteItems.length > 0 ? 'mt-3' : ''}>
+              {!(collapsed && !isMobile) && (
+                <p className="mb-0.5 mt-3 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50">
+                  {section.label}
+                </p>
+              )}
+              {(collapsed && !isMobile) && sectionIdx > 0 && (
+                <div className="mx-3 mb-2 border-t border-border" />
+              )}
+
+              <ul className="space-y-0.5 px-2">
+                {section.items.map((item) => (
+                  <SidebarNavItem
+                    key={item.path}
+                    item={item}
+                    collapsed={collapsed && !isMobile}
+                    isFavorite={isFavorite(item.path)}
+                    onToggleFavorite={toggleFav}
+                    onClick={closeMobile}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </aside>
+    </>
   );
 }
 
@@ -210,11 +224,13 @@ function SidebarNavItem({
   collapsed,
   isFavorite,
   onToggleFavorite,
+  onClick,
 }: {
   item: NavItem;
   collapsed: boolean;
   isFavorite: boolean;
   onToggleFavorite: (path: string) => void;
+  onClick?: () => void;
 }) {
   const Icon = iconMap[item.icon] ?? LayoutDashboard;
 
@@ -222,6 +238,7 @@ function SidebarNavItem({
     <li className="group relative">
       <NavLink
         to={item.path}
+        onClick={onClick}
         className={({ isActive }) =>
           cn(
             'relative flex items-center gap-3 rounded-md px-3.5 py-1.5 text-[13px] font-medium transition-all duration-100',

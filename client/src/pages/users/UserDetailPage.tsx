@@ -11,7 +11,11 @@ import {
   Mail,
   Phone,
   UserCog,
+  Trash2,
+  RefreshCw,
+  Fingerprint,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
@@ -39,6 +43,11 @@ interface RawUser {
   is_verified: boolean;
   roles: Array<{ _id: string; name: string; slug: string }>;
   custom_fields?: Record<string, any>;
+  security_metadata?: {
+    is_2fa_enabled: boolean;
+    passkeys_count: number;
+    has_phone: boolean;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -139,6 +148,28 @@ export default function UserDetailPage() {
     }
   };
 
+  const handleTerminateSession = async (sessionId: string) => {
+    if (!id || !window.confirm('Are you sure you want to terminate this session? The user will be signed out from that device.')) return;
+    try {
+      await api.delete(`/admin/users/${id}/sessions/${sessionId}`);
+      toast.success('Session terminated');
+      fetchSessions();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const handleReset2FA = async () => {
+    if (!id || !window.confirm('DANGER: This will disable 2FA for this user. Only do this if the user has lost access to their device. Active sessions will REMAIN active.')) return;
+    try {
+      await api.post(`/admin/users/${id}/2fa/reset`);
+      toast.success('Two-factor authentication disabled');
+      fetchUser();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
   const handleImpersonate = async () => {
     if (!id) return;
     setIsImpersonating(true);
@@ -213,6 +244,21 @@ export default function UserDetailPage() {
       key: 'last_activity',
       header: 'Last Active',
       render: (s) => new Date(s.last_activity).toLocaleString()
+    },
+    {
+      key: 'actions',
+      header: '',
+      className: 'w-[50px]',
+      render: (s) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleTerminateSession(s._id)}
+          className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )
     }
   ];
 
@@ -228,10 +274,19 @@ export default function UserDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge
-            status={raw.status === 'active' ? 'success' : 'error'}
+            status={raw.status === 'active' ? 'success' : raw.status === 'pending' ? 'warning' : 'error'}
             label={raw.status}
             className="text-sm px-3 py-1"
           />
+          {raw.security_metadata?.is_2fa_enabled ? (
+            <Badge variant="success" className="gap-1 px-3 py-1">
+              <Shield className="h-3 w-3" /> 2FA Active
+            </Badge>
+          ) : (
+            <Badge variant="warning" className="gap-1 px-3 py-1">
+              <Shield className="h-3 w-3" /> 2FA Disabled
+            </Badge>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -292,6 +347,26 @@ export default function UserDetailPage() {
                   )}
                 </div>
               </div>
+
+              {/* Security Summary Section */}
+              <div className="border-t border-border mt-4 pt-4 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Security Overview</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-md border border-border p-2 bg-muted/30">
+                    <div className="text-[10px] text-muted-foreground">Passkeys</div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Fingerprint className="h-3.5 w-3.5 text-primary" />
+                      {raw.security_metadata?.passkeys_count || 0}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border p-2 bg-muted/30">
+                    <div className="text-[10px] text-muted-foreground">2FA Method</div>
+                    <div className="font-bold">
+                      {raw.security_metadata?.is_2fa_enabled ? 'TOTP/SMS' : 'None'}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -312,6 +387,9 @@ export default function UserDetailPage() {
                 </TabsTrigger>
                 <TabsTrigger value="custom" className="gap-2">
                   <UserIcon className="h-4 w-4" /> Custom Fields
+                </TabsTrigger>
+                <TabsTrigger value="security" className="gap-2">
+                  <Shield className="h-4 w-4" /> Security Ops
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -352,6 +430,65 @@ export default function UserDetailPage() {
                   fetchUser();
                 }}
               />
+            </TabsContent>
+
+            <TabsContent value="security" className="p-6">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Account Recovery Actions</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Card className="border-border bg-transparent shadow-none">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 rounded-full bg-orange-500/10 p-2">
+                            <Shield className="h-4 w-4 text-orange-500" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold">Reset 2FA Status</div>
+                            <p className="text-xs text-muted-foreground mt-1">Disables 2FA and clears the secret key. Use if the user lost their device.</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full border-orange-500/20 text-orange-500 hover:bg-orange-500/10"
+                          onClick={handleReset2FA}
+                          disabled={!raw.security_metadata?.is_2fa_enabled}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" /> Reset 2FA
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-border bg-transparent shadow-none">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 rounded-full bg-primary/10 p-2">
+                            <Clock className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold">Terminate All Sessions</div>
+                            <p className="text-xs text-muted-foreground mt-1">Forces Logout from all devices including current active tokens.</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={async () => {
+                            if (!window.confirm('Terminate all sessions?')) return;
+                            await api.post(`/admin/users/${id}/reset-password`, { new_password: 'TEMPORARY_RESET_PENDING' });
+                            toast.success('All sessions revoked');
+                            fetchSessions();
+                          }}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" /> Terminate All
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </Card>

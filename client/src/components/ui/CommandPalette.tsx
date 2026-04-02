@@ -6,19 +6,17 @@ import {
   Shield, 
   Settings, 
   BarChart3, 
-  KeyRound, 
-  Mail, 
   Terminal,
-  Moon,
-  Sun,
   LayoutDashboard,
   LogOut,
   Command,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useAuthStore } from '@/stores/authStore';
 import { useAppSettings } from '@/hooks/useAppSettings';
+import api from '@/lib/api/client';
 
 interface CommandItem {
   id: string;
@@ -26,7 +24,7 @@ interface CommandItem {
   description?: string;
   icon: React.ElementType;
   shortcut?: string;
-  category: 'Navigation' | 'Actions' | 'Tools';
+  category: 'Navigation' | 'Actions' | 'Tools' | 'Search Results';
   action: () => void;
 }
 
@@ -34,9 +32,44 @@ export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [dynamicResults, setDynamicResults] = useState<CommandItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
   const { siteName } = useAppSettings();
+
+  // Dynamic search for users/entities
+  useEffect(() => {
+    if (query.length < 2) {
+      setDynamicResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await api.get('/admin/users', { params: { search: query, limit: 5 } });
+        const users = res.data.data.items || res.data.data.users || [];
+        
+        const userCommands: CommandItem[] = users.map((u: any) => ({
+          id: `user-${u._id}`,
+          title: `${u.first_name} ${u.last_name || ''}`,
+          description: `User: ${u.email} (${u.status})`,
+          icon: Users,
+          category: 'Search Results',
+          action: () => navigate(`/users/${u._id}`)
+        }));
+
+        setDynamicResults(userCommands);
+      } catch (err) {
+        console.error('Command search failed:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query, navigate]);
 
   const commands: CommandItem[] = useMemo(() => [
     { 
@@ -97,15 +130,18 @@ export function CommandPalette() {
     },
   ], [navigate, logout]);
 
-  const filteredCommands = useMemo(() => {
-    if (!query) return commands;
-    const lowerQuery = query.toLowerCase();
-    return commands.filter(cmd => 
-      cmd.title.toLowerCase().includes(lowerQuery) || 
-      cmd.description?.toLowerCase().includes(lowerQuery) ||
-      cmd.category.toLowerCase().includes(lowerQuery)
-    );
-  }, [commands, query]);
+  const allFiltered = useMemo(() => {
+    let base = commands;
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      base = commands.filter(cmd => 
+        cmd.title.toLowerCase().includes(lowerQuery) || 
+        cmd.description?.toLowerCase().includes(lowerQuery) ||
+        cmd.category.toLowerCase().includes(lowerQuery)
+      );
+    }
+    return [...base, ...dynamicResults];
+  }, [commands, query, dynamicResults]);
 
   const toggle = useCallback(() => setIsOpen(prev => !prev), []);
 
@@ -127,14 +163,14 @@ export function CommandPalette() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIndex(prev => (prev + 1) % filteredCommands.length);
+      setActiveIndex(prev => (prev + 1) % allFiltered.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+      setActiveIndex(prev => (prev - 1 + allFiltered.length) % allFiltered.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filteredCommands[activeIndex]) {
-        filteredCommands[activeIndex].action();
+      if (allFiltered[activeIndex]) {
+        allFiltered[activeIndex].action();
         setIsOpen(false);
         setQuery('');
       }
@@ -155,10 +191,14 @@ export function CommandPalette() {
       <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 border-b border-slate-100 dark:border-zinc-800 h-14 bg-slate-50/50 dark:bg-zinc-900/50">
-          <Search className="h-5 w-5 text-slate-400" />
+          {isSearching ? (
+            <Loader2 className="h-5 w-5 text-primary animate-spin" />
+          ) : (
+            <Search className="h-5 w-5 text-slate-400" />
+          )}
           <input 
             autoFocus
-            placeholder={`Search ${siteName} commands...`}
+            placeholder={`Search ${siteName} commands or users...`}
             className="flex-1 bg-transparent border-none outline-none text-slate-700 dark:text-zinc-200 text-sm font-medium"
             value={query}
             onChange={e => {
@@ -174,17 +214,17 @@ export function CommandPalette() {
 
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto p-2 custom-palette-scrollbar">
-          {filteredCommands.length > 0 ? (
+          {allFiltered.length > 0 ? (
             <div className="space-y-1">
-              {['Navigation', 'Actions', 'Tools'].map(category => {
-                const catItems = filteredCommands.filter(c => c.category === category);
+              {['Navigation', 'Search Results', 'Actions', 'Tools'].map(category => {
+                const catItems = allFiltered.filter(c => c.category === category);
                 if (catItems.length === 0) return null;
 
                 return (
                   <div key={category} className="mb-2 last:mb-0">
                     <p className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none bg-slate-50/50 dark:bg-zinc-800/30 rounded-md mb-1">{category}</p>
                     {catItems.map((cmd) => {
-                      const isSelected = filteredCommands[activeIndex]?.id === cmd.id;
+                      const isSelected = allFiltered[activeIndex]?.id === cmd.id;
                       const Icon = cmd.icon;
 
                       return (
@@ -197,7 +237,7 @@ export function CommandPalette() {
                               : "hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400"
                           )}
                           onMouseEnter={() => {
-                             const idx = filteredCommands.findIndex(f => f.id === cmd.id);
+                             const idx = allFiltered.findIndex(f => f.id === cmd.id);
                              setActiveIndex(idx);
                           }}
                           onClick={() => {
@@ -227,7 +267,7 @@ export function CommandPalette() {
                           </div>
                           {isSelected && (
                             <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest animate-in slide-in-from-right-3 duration-200">
-                               GO <ArrowRight className="h-3 w-3" />
+                                GO <ArrowRight className="h-3 w-3" />
                             </div>
                           )}
                         </div>

@@ -5,6 +5,10 @@ interface SidebarContextType {
   setCollapsed: (collapsed: boolean) => void;
   toggle: () => void;
   isMobile: boolean;
+  isMobileOpen: boolean;
+  setIsMobileOpen: (open: boolean) => void;
+  toggleMobile: () => void;
+  closeMobile: () => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -17,6 +21,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [isMobile, setIsMobile] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // Handle window resizing
   useEffect(() => {
@@ -43,8 +48,20 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setCollapsed(!collapsed);
   }, [collapsed, setCollapsed]);
 
+  const toggleMobile = useCallback(() => setIsMobileOpen(prev => !prev), []);
+  const closeMobile = useCallback(() => setIsMobileOpen(false), []);
+
   return (
-    <SidebarContext.Provider value={{ collapsed, setCollapsed, toggle, isMobile }}>
+    <SidebarContext.Provider value={{ 
+      collapsed, 
+      setCollapsed, 
+      toggle, 
+      isMobile, 
+      isMobileOpen, 
+      setIsMobileOpen, 
+      toggleMobile, 
+      closeMobile 
+    }}>
       {children}
     </SidebarContext.Provider>
   );

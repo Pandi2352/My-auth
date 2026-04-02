@@ -109,7 +109,72 @@ export class AdminUserService {
                 error_description: 'User not found',
             });
         }
-        return user;
+        
+        // Add security metadata
+        const metadata = {
+            is_2fa_enabled: user.is_2fa_enabled,
+            passkeys_count: user.authenticators?.length || 0,
+            has_phone: !!user.phone,
+        };
+
+        return { ...user.toObject(), security_metadata: metadata };
+    }
+
+    async getUserSessions(userId: string) {
+        // We use the refresh tokens as the source of truth for active sessions
+        const tokens = await this.refreshTokenModel.find({ 
+            user_id: new Types.ObjectId(userId),
+            is_revoked: false,
+            expires_at: { $gt: new Date() }
+        }).sort({ last_activity: -1 });
+
+        return tokens.map(t => ({
+            _id: t._id,
+            device: t.device,
+            browser: t.browser,
+            os: t.os,
+            ip_address: t.ip_address,
+            location: t.location,
+            last_activity: t.last_activity,
+            is_active: t.expires_at > new Date() && !t.is_revoked,
+            user_agent: t.user_agent,
+        }));
+    }
+
+    async terminateUserSession(userId: string, sessionId: string) {
+        const result = await this.refreshTokenModel.findOneAndUpdate(
+            { _id: new Types.ObjectId(sessionId), user_id: new Types.ObjectId(userId) },
+            { $set: { is_revoked: true } }
+        );
+
+        if (!result) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.NOT_FOUND,
+                error: 'session_not_found',
+                error_description: 'Session not found for this user',
+            });
+        }
+
+        return { message: 'Session terminated successfully' };
+    }
+
+    async resetUser2FA(userId: string) {
+        const result = await this.userModel.findByIdAndUpdate(userId, {
+            $set: {
+                is_2fa_enabled: false,
+                two_fa_secret: null,
+            }
+        });
+
+        if (!result) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.NOT_FOUND,
+                error: 'user_not_found',
+                error_description: 'User not found',
+            });
+        }
+
+        return { message: 'Two-factor authentication has been disabled for this user' };
     }
 
     // ── Create User (Admin) ─────────────────────────────────

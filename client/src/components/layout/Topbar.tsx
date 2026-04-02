@@ -1,7 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { LogOut, User, ChevronDown, Sun, Moon, Search, Settings, ShieldCheck, UserCog, X, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { 
+  LogOut, 
+  User, 
+  ChevronDown, 
+  Sun, 
+  Moon, 
+  Search, 
+  Settings, 
+  ShieldCheck, 
+  UserCog, 
+  X, 
+  PanelLeftOpen, 
+  PanelLeftClose,
+  Menu
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { useTheme } from '@/hooks/useTheme';
@@ -11,7 +25,12 @@ import { NotificationBell } from '@/components/ui/NotificationBell';
 import { useSidebar } from '@/contexts/SidebarContext';
 
 export function Topbar() {
-  const { collapsed: sidebarCollapsed, toggle: onToggle } = useSidebar();
+  const { 
+    collapsed: sidebarCollapsed, 
+    toggle: onToggle, 
+    isMobile, 
+    toggleMobile 
+  } = useSidebar();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -68,7 +87,7 @@ export function Topbar() {
         <div
           className={cn(
             'fixed top-0 right-0 z-30 flex h-10 items-center justify-center gap-3 bg-amber-500 text-white text-sm font-medium transition-[left] duration-100 ease-linear',
-            sidebarCollapsed ? 'left-16' : 'left-64',
+            isMobile ? 'left-0' : (sidebarCollapsed ? 'left-16' : 'left-64'),
           )}
         >
           <UserCog className="h-4 w-4" />
@@ -95,24 +114,34 @@ export function Topbar() {
       <div
         className={cn(
           'flex h-full w-full items-center justify-between transition-[padding-left] duration-100 ease-linear',
-          sidebarCollapsed ? 'pl-16' : 'pl-64',
+          isMobile ? 'pl-0' : (sidebarCollapsed ? 'pl-16' : 'pl-64'),
         )}
       >
         {/* Left: Toggle & Breadcrumbs */}
         <div className="flex items-center pl-2">
-          <button
-            onClick={onToggle}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <PanelLeftOpen className="h-4.5 w-4.5" />
-            ) : (
-              <PanelLeftClose className="h-4.5 w-4.5" />
-            )}
-          </button>
+          {isMobile ? (
+            <button
+              onClick={toggleMobile}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          ) : (
+            <button
+              onClick={onToggle}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-4.5 w-4.5" />
+              ) : (
+                <PanelLeftClose className="h-4.5 w-4.5" />
+              )}
+            </button>
+          )}
           <div className="ml-2">
-            <Breadcrumbs />
+            {!isMobile && <Breadcrumbs />}
           </div>
         </div>
 

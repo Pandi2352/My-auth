@@ -21,6 +21,7 @@ import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.sche
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { UserAgentHelper } from '../../utils/UserAgentHelper.js';
 
 @Injectable()
 export class AuthService {
@@ -243,13 +244,18 @@ export class AuthService {
         const token_hash = await this.bcrypt.generateBcryptPassword(refresh_token);
         const expires_at = this.parseExpiresIn(refresh_expires_in);
 
+        const { browser, os } = UserAgentHelper.parse(userAgent);
+
         await this.refreshTokenModel.create({
             user_id: user._id,
             token_hash,
-            device: userAgent,
+            device: os, // Use OS as device name for now
+            browser,
+            os,
             ip_address: ip,
             user_agent: userAgent,
             expires_at,
+            last_activity: new Date(),
         });
 
         // Create session

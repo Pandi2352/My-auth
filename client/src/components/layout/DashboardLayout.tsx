@@ -22,7 +22,7 @@ function SkeletonContent() {
 }
 
 export function DashboardLayout() {
-  const { collapsed } = useSidebar();
+  const { collapsed, isMobile } = useSidebar();
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
 
@@ -45,7 +45,7 @@ export function DashboardLayout() {
       <main
         className={cn(
           'transition-[padding-left] duration-100 ease-linear',
-          collapsed ? 'pl-16' : 'pl-64',
+          isMobile ? 'pl-0' : (collapsed ? 'pl-16' : 'pl-64'),
           localStorage.getItem('impersonating_user') ? 'pt-[96px]' : 'pt-14',
         )}
       >
