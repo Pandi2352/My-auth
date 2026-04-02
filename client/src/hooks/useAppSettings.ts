@@ -47,17 +47,15 @@ export function useAppSettings(): AppSettings {
     // Skip fetch if memory cache is fresh
     if (memoryCache && Date.now() - memoryCache.timestamp < CACHE_TTL) return;
 
-    api.get(SETTINGS.LIST)
+    api.get(SETTINGS.PUBLIC_CONFIG)
       .then((res) => {
-        const list = Array.isArray(res.data.data) ? res.data.data : [];
-        const map: Record<string, any> = list.reduce((m: any, s: any) => ({ ...m, [s.key]: s.value }), {});
         const data: AppSettings = {
-          siteName: map['app.site_name'] || 'Admin',
-          logoUrl: map['app.logo_url'] || '',
-          faviconUrl: map['app.favicon_url'] || '',
-          primaryColor: map['app.primary_color'] || '#0f172a',
-          accentColor: map['app.accent_color'] || '#6366f1',
-          customCss: map['app.custom_css'] || '',
+          siteName: res.data.site_name || 'Admin',
+          logoUrl: res.data.logo_url || '',
+          faviconUrl: res.data.favicon_url || '',
+          primaryColor: res.data.primary_color || '#0f172a',
+          accentColor: res.data.accent_color || '#6366f1',
+          customCss: res.data.custom_css || '',
         };
         setSettings(data);
         const cache = { data, timestamp: Date.now() };

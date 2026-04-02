@@ -26,7 +26,8 @@ export class WebAuthnService {
     private configService: ConfigService,
   ) {
     this.rpID = this.configService.get<string>('WEBAUTHN_RP_ID', 'localhost');
-    this.origin = this.configService.get<string>('WEBAUTHN_ORIGIN', 'http://localhost:5173');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    this.origin = this.configService.get<string>('WEBAUTHN_ORIGIN', frontendUrl);
   }
 
   async getRegistrationOptions(userId: string) {
@@ -45,7 +46,7 @@ export class WebAuthnService {
         authenticatorAttachment: 'cross-platform', // Changed to cross-platform to allow Yubikeys too
       },
       excludeCredentials: user.authenticators.map(auth => ({
-        id: auth.credentialID,
+        id: auth.credentialID.toString('base64url'),
         type: 'public-key',
         transports: auth.transports,
       })),
@@ -88,6 +89,8 @@ export class WebAuthnService {
         credentialDeviceType,
         credentialBackedUp,
         transports: body.response.transports,
+        name: (credentialDeviceType as any) === 'single_device' ? 'Platform Passkey' : 'Roaming Security Key',
+        last_used_at: new Date(),
       };
 
       await this.userModel.findByIdAndUpdate(userId, {
@@ -107,21 +110,26 @@ export class WebAuthnService {
       user = await this.userModel.findOne({ email });
     }
 
-    const options = await generateAuthenticationOptions({
-      rpID: this.rpID,
-      allowCredentials: user?.authenticators.map(auth => ({
-        id: auth.credentialID,
-        type: 'public-key',
-        transports: auth.transports,
-      })),
-      userVerification: 'preferred',
-    });
+    try {
+      const options = await generateAuthenticationOptions({
+        rpID: this.rpID,
+        allowCredentials: user?.authenticators.map(auth => ({
+          id: auth.credentialID.toString('base64url'),
+          type: 'public-key',
+          transports: auth.transports,
+        })),
+        userVerification: 'preferred',
+      });
 
-    if (user) {
-      await this.userModel.findByIdAndUpdate(user._id, { current_challenge: options.challenge });
+      if (user) {
+        await this.userModel.findByIdAndUpdate(user._id, { current_challenge: options.challenge });
+      }
+
+      return options;
+    } catch (error: any) {
+      this.logger.error(`Error generating authentication options: ${error.message}`, error.stack);
+      throw error;
     }
-
-    return options;
   }
 
   async getAuthenticators(userId: string) {
@@ -134,6 +142,8 @@ export class WebAuthnService {
       credentialBackedUp: auth.credentialBackedUp,
       transports: auth.transports,
       counter: auth.counter,
+      name: auth.name || (auth.credentialDeviceType === 'single_device' ? 'Platform Passkey' : 'Roaming Security Key'),
+      last_used_at: auth.last_used_at,
     }));
   }
 
@@ -173,12 +183,13 @@ export class WebAuthnService {
     const { verified, authenticationInfo } = verification;
 
     if (verified) {
-      // Update counter
+      // Update counter and last used
       await this.userModel.updateOne(
         { _id: user._id, 'authenticators.credentialID': authenticator.credentialID },
         { 
           $set: { 
             'authenticators.$.counter': authenticationInfo.newCounter,
+            'authenticators.$.last_used_at': new Date(),
             current_challenge: null 
           } 
         }
@@ -191,10 +202,22 @@ export class WebAuthnService {
   }
 
   async deleteAuthenticator(userId: string, credentialID: string) {
-    // credentialID is passed as base64url string from frontend
     await this.userModel.findByIdAndUpdate(userId, {
       $pull: { authenticators: { credentialID: Buffer.from(credentialID, 'base64url') } }
     });
     return { success: true, message: 'Passkey deleted successfully' };
+  }
+
+  async renameAuthenticator(userId: string, credentialID: string, name: string) {
+    const result = await this.userModel.updateOne(
+      { _id: userId, 'authenticators.credentialID': Buffer.from(credentialID, 'base64url') },
+      { $set: { 'authenticators.$.name': name } }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new ErrorEntity({ http_code: HttpStatus.NOT_FOUND, error: 'authenticator_not_found', error_description: 'Authenticator not found' });
+    }
+
+    return { success: true, message: 'Passkey renamed successfully' };
   }
 }

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { 
-  Fingerprint,
   ShieldCheck,
   ShieldOff,
   Smartphone,
+  Fingerprint,
   QrCode,
   Link2,
   Unlink,
@@ -18,9 +18,8 @@ import {
   Copy,
   RefreshCcw,
   Trash2,
+  Plus,
   Key,
-  Database,
-  Plus
 } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { usePagination } from '@/hooks/usePagination';
@@ -72,6 +71,8 @@ interface Authenticator {
   credentialBackedUp: boolean;
   transports?: string[];
   counter: number;
+  name: string;
+  last_used_at: string;
 }
 
 export default function SecurityPage() {
@@ -135,6 +136,8 @@ function PasskeysSection() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
 
   const fetchAuthenticators = async () => {
     setIsLoading(true);
@@ -167,16 +170,10 @@ function PasskeysSection() {
   const handleRegister = async () => {
     setIsRegistering(true);
     try {
-      // 1. Get options from server
       const optionsRes = await api.get('/auth/webauthn/register/options');
       const options = optionsRes.data.data;
-
-      // 2. Start browser ceremony
       const attestationResponse = await startRegistration({ optionsJSON: options });
-
-      // 3. Verify on server
       await api.post('/auth/webauthn/register/verify', attestationResponse);
-      
       toast.success('Passkey registered successfully');
       fetchAuthenticators();
     } catch (error: any) {
@@ -188,6 +185,24 @@ function PasskeysSection() {
     } finally {
       setIsRegistering(false);
     }
+  };
+
+  const handleRename = async () => {
+    if (!renameId || !newName.trim()) return;
+    try {
+      await api.post(`/auth/webauthn/authenticators/${renameId}/rename`, { name: newName });
+      toast.success('Passkey renamed');
+      setRenameId(null);
+      setNewName('');
+      fetchAuthenticators();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const openRename = (auth: Authenticator) => {
+    setRenameId(auth.credentialID);
+    setNewName(auth.name);
   };
 
   return (
@@ -220,43 +235,64 @@ function PasskeysSection() {
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-border rounded-lg border border-border">
               {authenticators.map((auth) => (
                 <div
                   key={auth.credentialID}
-                  className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-muted/30"
+                  className="flex items-center justify-between p-4 transition-colors hover:bg-muted/30"
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                      <Key className="h-5 w-5 text-primary" />
+                      <Fingerprint className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {auth.credentialDeviceType === 'single_device' ? 'Platform Passkey' : 'Roaming Security Key'}
+                      <p className="text-sm font-semibold text-foreground">
+                        {auth.name}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-0.5">
                         <span className="flex items-center gap-1">
-                          <Database className="h-3 w-3" /> {auth.credentialID.substring(0, 12)}...
+                          <Monitor className="h-3.5 w-3.5" /> 
+                          {(auth.credentialDeviceType as any) === 'single_device' ? 'Platform Passkey' : 'Roaming Security Key'}
+                        </span>
+                        <span>•</span>
+                        {auth.last_used_at && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" /> 
+                            Used {new Date(auth.last_used_at).toLocaleDateString()}
+                          </span>
+                        )}
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <RefreshCcw className="h-3.5 w-3.5" /> 
+                          {auth.counter} usages
                         </span>
                         <span>•</span>
                         {auth.credentialBackedUp ? (
-                          <span className="text-green-600 font-medium">Backed up</span>
+                          <span className="text-green-600 font-medium bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">Backed up</span>
                         ) : (
-                          <span className="text-amber-600 font-medium">Not backed up</span>
+                          <span className="text-amber-600 font-medium bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded">Not backed up</span>
                         )}
-                        <span>•</span>
-                        <span>Used {auth.counter} times</span>
                       </div>
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-red-600"
-                    onClick={() => setDeleteId(auth.credentialID)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-primary"
+                      onClick={() => openRename(auth)}
+                    >
+                      <Key className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-red-600"
+                      onClick={() => setDeleteId(auth.credentialID)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -272,6 +308,25 @@ function PasskeysSection() {
         message="Are you sure you want to delete this passkey? You won't be able to use it to sign in anymore."
         confirmLabel="Delete"
         variant="danger"
+      />
+
+      <ConfirmDialog
+        open={!!renameId}
+        onClose={() => setRenameId(null)}
+        onConfirm={handleRename}
+        title="Rename Passkey"
+        message={
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-muted-foreground">Give this passkey a friendly name to identify it easily.</p>
+            <Input 
+              value={newName} 
+              onChange={(e) => setNewName(e.target.value)} 
+              placeholder="e.g. My iPhone, Work Laptop"
+              autoFocus
+            />
+          </div>
+        }
+        confirmLabel="Save"
       />
 
       <Card className="bg-primary/5 border-primary/20">

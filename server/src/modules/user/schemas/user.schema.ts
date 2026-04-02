@@ -77,6 +77,8 @@ export class User {
         credentialDeviceType: { type: String },
         credentialBackedUp: { type: Boolean },
         transports: { type: [String] },
+        name: { type: String, default: 'Passkey' },
+        last_used_at: { type: Date, default: Date.now },
     }], default: [] })
     authenticators: any[];
 

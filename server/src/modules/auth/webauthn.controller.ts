@@ -69,4 +69,15 @@ export class WebAuthnController {
   async deleteAuthenticator(@Req() req: any, @Param('id') credentialId: string) {
     return this.webAuthnService.deleteAuthenticator(req.user._id.toString(), credentialId);
   }
+
+  @Post('authenticators/:id/rename')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Rename a registered passkey' })
+  async renameAuthenticator(
+    @Req() req: any, 
+    @Param('id') credentialId: string, 
+    @Body('name') name: string
+  ) {
+    return this.webAuthnService.renameAuthenticator(req.user._id.toString(), credentialId, name);
+  }
 }
