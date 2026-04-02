@@ -11,3 +11,4 @@ export type { Column, SortState } from './DataTable';
 export { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal';
 export { ConfirmDialog } from './ConfirmDialog';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
+export { Badge } from './Badge';

@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/Input';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
+import { Badge } from '@/components/ui';
 import api from '@/lib/api/client';
 import { AUTH, SESSIONS, SOCIAL } from '@/lib/api/endpoints';
 import { handleApiError } from '@/lib/api/handleError';
@@ -75,8 +76,51 @@ interface Authenticator {
   last_used_at: string;
 }
 
+interface Session {
+  _id: string;
+  browser: string;
+  os: string;
+  ip_address: string;
+  location: string;
+  last_activity: string;
+  is_current: boolean;
+  user_agent: string;
+}
+
 export default function SecurityPage() {
   useDocumentTitle('Security');
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+
+  const handleExportData = async () => {
+    try {
+      const res = await api.get('/user/data-export');
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data.data, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `account-data-${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      toast.success('Data exported successfully');
+    } catch (error) {
+      handleApiError(error, 'Failed to export data');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      toast.error('Please enter your password to confirm');
+      return;
+    }
+    try {
+      await api.delete('/user/account', { data: { password: deletePassword } });
+      toast.success('Account deleted successfully');
+      window.location.href = '/login';
+    } catch (error) {
+      handleApiError(error, 'Failed to delete account');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -94,6 +138,9 @@ export default function SecurityPage() {
           </TabsTrigger>
           <TabsTrigger value="2fa" className="gap-2">
             <Smartphone className="h-4 w-4" /> Two-Factor Auth
+          </TabsTrigger>
+          <TabsTrigger value="sessions" className="gap-2">
+            <Monitor className="h-4 w-4" /> Active Devices
           </TabsTrigger>
           <TabsTrigger value="social" className="gap-2">
             <Link2 className="h-4 w-4" /> Linked Accounts
@@ -113,6 +160,9 @@ export default function SecurityPage() {
           <TabsContent value="2fa">
             <TwoFactorSection />
           </TabsContent>
+          <TabsContent value="sessions">
+            <SessionsSection />
+          </TabsContent>
           <TabsContent value="social">
             <LinkedAccountsSection />
           </TabsContent>
@@ -124,6 +174,80 @@ export default function SecurityPage() {
           </TabsContent>
         </div>
       </Tabs>
+
+      {/* Danger Zone */}
+      <div className="pt-10 border-t border-muted/30">
+        <div className="flex items-center gap-2 text-red-500 mb-4 px-1">
+          <ShieldOff className="h-5 w-5" />
+          <h2 className="text-lg font-bold tracking-tight">Danger Zone</h2>
+        </div>
+        
+        <div className="grid gap-4">
+          <Card className="border-red-500/20 bg-red-500/5">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Export Account Data</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Download a JSON file containing all your profile, preference, and security data.
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="shrink-0 border-muted-foreground/20"
+                onClick={handleExportData}
+              >
+                <Copy className="h-3.5 w-3.5 mr-2" />
+                Export Data
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-500/20 bg-red-500/5">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400">Delete Account</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Permanently remove your account and all associated data. This action cannot be undone.
+                </p>
+              </div>
+              <Button 
+                variant="danger" 
+                size="sm" 
+                className="shrink-0"
+                onClick={() => setShowDeleteAccount(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Delete Account
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Delete Account Dialog */}
+      <ConfirmDialog
+        open={showDeleteAccount}
+        onClose={() => { setShowDeleteAccount(false); setDeletePassword(''); }}
+        onConfirm={handleDeleteAccount}
+        title="Delete Account?"
+        message={
+          <div className="space-y-3 pt-2 text-left">
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete your account and all data. To confirm, please enter your password.
+            </p>
+            <Input 
+              type="password"
+              value={deletePassword} 
+              onChange={(e) => setDeletePassword(e.target.value)} 
+              placeholder="Your password"
+              autoFocus
+            />
+          </div>
+        }
+        confirmLabel="Permanently Delete"
+        variant="danger"
+      />
     </div>
   );
 }
@@ -564,7 +688,151 @@ function TwoFactorSection() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 2. Linked Social Accounts
+// 2. Active Sessions
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function SessionsSection() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchSessions = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(SESSIONS.LIST);
+      setSessions(res.data.data || []);
+    } catch (error) {
+      handleApiError(error, 'Failed to load sessions');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const terminateSession = async (id: string) => {
+    try {
+      await api.delete(SESSIONS.TERMINATE(id));
+      toast.success('Session terminated');
+      fetchSessions();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const terminateAllOtherSessions = async () => {
+    try {
+      await api.delete(SESSIONS.TERMINATE_ALL);
+      toast.success('All other sessions terminated');
+      fetchSessions();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Active Devices</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Devices currently signed into your account.
+          </p>
+        </div>
+        {sessions.length > 1 && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            onClick={terminateAllOtherSessions}
+          >
+            Sign out of all other devices
+          </Button>
+        )}
+      </div>
+
+      <div className="grid gap-4">
+        {isLoading ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+        ) : (
+          <>
+            {sessions.map((session) => (
+              <Card key={session._id} className="overflow-hidden bg-card/50 backdrop-blur-sm border-muted/20">
+                <div className="p-4 flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    {session.user_agent?.toLowerCase().includes('mobile') || session.user_agent?.toLowerCase().includes('android') || session.user_agent?.toLowerCase().includes('iphone') ? (
+                      <Smartphone className="h-6 w-6" />
+                    ) : (
+                      <Monitor className="h-6 w-6" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium truncate">{session.browser || 'Unknown Browser'} on {session.os || 'Unknown OS'}</h3>
+                        {session.is_current && (
+                          <Badge variant="secondary" className="text-[10px] py-0 h-4 uppercase tracking-wider">Current Device</Badge>
+                        )}
+                      </div>
+                      {!session.is_current && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-muted-foreground hover:text-red-500"
+                          onClick={() => terminateSession(session._id)}
+                        >
+                          Sign out
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Globe className="h-3.5 w-3.5 text-muted-foreground/60" />
+                        {session.ip_address}
+                        {session.location && <span className="opacity-60">• {session.location}</span>}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground/60" />
+                        Last active {new Date(session.last_activity).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+
+            {sessions.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl border-muted/20">
+                <div className="h-12 w-12 rounded-full bg-muted/10 flex items-center justify-center mb-4 text-muted-foreground/40">
+                  <Monitor className="h-6 w-6" />
+                </div>
+                <h3 className="font-medium text-muted-foreground">No active sessions found</h3>
+                <p className="text-sm text-muted-foreground/60 mt-1 max-w-[250px]">
+                  Sign in from another device to see it listed here.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <Card className="bg-primary/5 border-primary/20">
+        <div className="p-4 flex gap-3">
+          <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-primary">Session Security</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              We use individual session tokens for every device. If you don't recognize a device or location, terminate the session immediately and change your password.
+            </p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 3. Linked Social Accounts
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function LinkedAccountsSection() {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
@@ -684,7 +952,7 @@ function LinkedAccountsSection() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 3. Login History
+// 4. Login History
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function LoginHistorySection() {
   const [attempts, setAttempts] = useState<LoginAttempt[]>([]);
@@ -791,7 +1059,7 @@ function LoginHistorySection() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 4. Security Events Timeline
+// 5. Security Events Timeline
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function SecurityEventsSection() {
   const [events, setEvents] = useState<SecurityEvent[]>([]);
