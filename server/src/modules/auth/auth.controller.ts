@@ -168,4 +168,16 @@ export class AuthController {
     disable2fa(@CurrentUser('_id') userId: string, @Body() dto: Verify2faDto) {
         return this.authService.disable2fa(userId, dto.token);
     }
+
+    @Public()
+    @Post('force-password-change')
+    @ApiOperation({ summary: 'Force password change on first login' })
+    forcePasswordChange(
+        @Req() req: any,
+        @Body() body: { user_id: string; current_pass: string; new_pass: string },
+        @Ip() ip: string
+    ) {
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        return this.authService.forcePasswordChange(body.user_id, body.current_pass, body.new_pass, ip, userAgent);
+    }
 }

@@ -48,4 +48,14 @@ export class InAppNotificationController {
     deleteAll(@CurrentUser('_id') userId: string) {
         return this.notifService.deleteAll(userId);
     }
+
+    @Patch(':id/action')
+    @ApiOperation({ summary: 'Perform an action on a notification (Approve/Reject)' })
+    performAction(
+        @CurrentUser('_id') userId: string,
+        @Param('id') id: string,
+        @Query('result') result: 'approved' | 'rejected',
+    ) {
+        return this.notifService.performAction(userId, id, result);
+    }
 }

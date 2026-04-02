@@ -45,4 +45,9 @@ export class AdminCreateUserDto {
     @IsArray()
     @IsMongoId({ each: true })
     role_ids?: string[];
+
+    @ApiPropertyOptional({ example: false })
+    @IsOptional()
+    @IsBoolean()
+    requires_password_change?: boolean;
 }

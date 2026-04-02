@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsEnum, IsMongoId, IsObject, IsOptional, IsString } from 'class-validator';
 import { UserStatus } from '../../../common/enums/user-status.enum.js';
 
 export class AdminUpdateUserDto {
@@ -7,6 +7,17 @@ export class AdminUpdateUserDto {
     @IsOptional()
     @IsString()
     first_name?: string;
+
+    @ApiPropertyOptional({ type: [String], example: ['60f7b2c...'] })
+    @IsOptional()
+    @IsArray()
+    @IsMongoId({ each: true })
+    role_ids?: string[];
+
+    @ApiPropertyOptional({ example: false })
+    @IsOptional()
+    @IsBoolean()
+    requires_password_change?: boolean;
 
     @ApiPropertyOptional({ example: 'Doe' })
     @IsOptional()

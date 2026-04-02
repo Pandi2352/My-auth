@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Info, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Bell, CheckCheck, Info, AlertTriangle, CheckCircle, XCircle, MousePointerClick } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import api from '@/lib/api/client';
 import { NOTIFICATIONS } from '@/lib/api/endpoints';
@@ -13,10 +14,13 @@ interface Notification {
   _id: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error' | 'action';
   link?: string;
   is_read: boolean;
   created_at: string;
+  action_type?: string;
+  is_action_taken?: boolean;
+  action_result?: string;
 }
 
 const TYPE_STYLES: Record<string, { icon: React.ReactNode; bg: string }> = {
@@ -24,6 +28,7 @@ const TYPE_STYLES: Record<string, { icon: React.ReactNode; bg: string }> = {
   success: { icon: <CheckCircle className="h-4 w-4" />, bg: 'bg-green-100 text-green-600 dark:bg-green-900/30' },
   warning: { icon: <AlertTriangle className="h-4 w-4" />, bg: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30' },
   error: { icon: <XCircle className="h-4 w-4" />, bg: 'bg-red-100 text-red-600 dark:bg-red-900/30' },
+  action: { icon: <MousePointerClick className="h-4 w-4" />, bg: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30' },
 };
 
 export function NotificationBell() {
@@ -64,13 +69,13 @@ export function NotificationBell() {
 
   // Close on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const fetchUnreadCount = async () => {
@@ -113,6 +118,22 @@ export function NotificationBell() {
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch {}
+  };
+
+  const handleAction = async (id: string, result: 'approved' | 'rejected') => {
+    try {
+      await api.patch(NOTIFICATIONS.PERFORM_ACTION(id), null, { params: { result } });
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n._id === id
+            ? { ...n, is_action_taken: true, action_result: result, is_read: true }
+            : n,
+        ),
+      );
+      toast.success(`Request ${result} successfully`);
+    } catch (error) {
+      handleApiError(error);
+    }
   };
 
   const handleClick = (notif: Notification) => {
@@ -173,34 +194,65 @@ export function NotificationBell() {
               notifications.map((notif) => {
                 const style = TYPE_STYLES[notif.type] || TYPE_STYLES.info;
                 return (
-                  <button
+                  <div
                     key={notif._id}
-                    onClick={() => handleClick(notif)}
                     className={cn(
-                      'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent border-b border-border last:border-0',
+                      'flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors border-b border-border last:border-0 hover:bg-slate-50/50',
                       !notif.is_read && 'bg-primary/5',
                     )}
                   >
-                    <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full', style.bg)}>
-                      {style.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className={cn('text-xs font-medium truncate', notif.is_read ? 'text-muted-foreground' : 'text-foreground')}>
-                          {notif.title}
-                        </p>
-                        <span className="shrink-0 text-[10px] text-muted-foreground ml-2">
-                          {formatTime(notif.created_at)}
-                        </span>
+                    <div className="flex w-full items-start gap-3 cursor-pointer" onClick={() => handleClick(notif)}>
+                      <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full', style.bg)}>
+                        {style.icon}
                       </div>
-                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">
-                        {notif.message}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className={cn('text-xs font-semibold truncate', notif.is_read ? 'text-muted-foreground' : 'text-slate-900')}>
+                            {notif.title}
+                          </p>
+                          <span className="shrink-0 text-[10px] text-muted-foreground ml-2 font-bold uppercase">
+                            {formatTime(notif.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 font-medium leading-relaxed">
+                          {notif.message}
+                        </p>
+                      </div>
+                      {!notif.is_read && (
+                        <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                      )}
                     </div>
-                    {!notif.is_read && (
-                      <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
+
+                    {/* ACTION CENTER CONTROLS */}
+                    {notif.type === 'action' && (
+                      <div className="ml-11 mt-1 flex items-center gap-2">
+                        {notif.is_action_taken ? (
+                          <div className={cn(
+                            "flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider",
+                            notif.action_result === 'approved' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                          )}>
+                            {notif.action_result === 'approved' ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                            Request {notif.action_result}
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAction(notif._id, 'approved'); }}
+                              className="px-3 py-1 rounded bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-sm"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAction(notif._id, 'rejected'); }}
+                              className="px-3 py-1 rounded border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })
             )}

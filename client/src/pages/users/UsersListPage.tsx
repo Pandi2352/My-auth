@@ -36,8 +36,16 @@ export default function UsersListPage() {
   
   const { meta, page, limit, goToPage, changeLimit, updateMeta } = usePagination();
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
   // Dialog states
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [bulkStatusMode, setBulkStatusMode] = useState<'active' | 'suspended' | null>(null);
+  const [showBulkRoleModal, setShowBulkRoleModal] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
 
   // Fetch users
   const fetchUsers = async () => {
@@ -53,6 +61,8 @@ export default function UsersListPage() {
       const raw = res.data.data.users || [];
       setData(raw.map(mapBackendUser));
       updateMeta(res.data.data.meta_data);
+      // Clear selection on refresh/page change
+      setSelectedIds([]);
     } catch (error) {
       handleApiError(error, 'Failed to fetch users');
     } finally {
@@ -60,9 +70,22 @@ export default function UsersListPage() {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const res = await api.get('/roles');
+      setRoles(res.data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch roles', error);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, [page, limit, debouncedSearch, status]);
+
+  useEffect(() => {
+    if (showBulkRoleModal) fetchRoles();
+  }, [showBulkRoleModal]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -76,7 +99,82 @@ export default function UsersListPage() {
     }
   };
 
+  const handleBulkStatusUpdate = async (newStatus: 'active' | 'suspended') => {
+    try {
+      await api.patch(ADMIN_USERS.BULK_STATUS, {
+        user_ids: selectedIds,
+        status: newStatus
+      });
+      toast.success(`Successfully updated ${selectedIds.length} users`);
+      setBulkStatusMode(null);
+      fetchUsers();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const handleBulkRoleAssign = async () => {
+    if (!selectedRoleId) return;
+    try {
+      await api.post(ADMIN_USERS.BULK_ROLES, {
+        user_ids: selectedIds,
+        role_ids: [selectedRoleId]
+      });
+      toast.success(`Successfully assigned roles to ${selectedIds.length} users`);
+      setShowBulkRoleModal(false);
+      setSelectedRoleId('');
+      fetchUsers();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await api.delete(ADMIN_USERS.BULK_DELETE, {
+        data: { user_ids: selectedIds, soft: true }
+      });
+      toast.success(`Successfully deleted ${selectedIds.length} users`);
+      setBulkDeleteConfirm(false);
+      fetchUsers();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === data.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(data.map(u => u.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
   const columns: Column<User>[] = [
+    {
+      key: 'select',
+      header: (
+        <input 
+          type="checkbox" 
+          className="h-4 w-4 rounded border-border bg-background" 
+          checked={selectedIds.length > 0 && selectedIds.length === data.length}
+          onChange={toggleSelectAll}
+        />
+      ),
+      className: 'w-[40px]',
+      render: (user) => (
+        <input 
+          type="checkbox" 
+          className="h-4 w-4 rounded border-border bg-background" 
+          checked={selectedIds.includes(user.id)}
+          onChange={() => toggleSelect(user.id)}
+        />
+      )
+    },
     {
       key: 'name',
       header: 'Name',
@@ -92,7 +190,7 @@ export default function UsersListPage() {
           )}
           <div>
             <div className="font-medium text-foreground">{user.firstName} {user.lastName}</div>
-            <div className="text-xs text-muted-foreground">{user.id}</div>
+            <div className="text-[10px] tabular-nums text-muted-foreground">{user.id}</div>
           </div>
         </div>
       )
@@ -103,7 +201,7 @@ export default function UsersListPage() {
       sortable: true,
       render: (user) => (
         <div>
-          <div className="text-foreground">{user.email}</div>
+          <div className="text-foreground max-w-[200px] truncate">{user.email}</div>
           {user.isEmailVerified ? (
             <div className="text-[10px] text-green-500 font-medium">Verified</div>
           ) : (
@@ -118,7 +216,7 @@ export default function UsersListPage() {
       render: (user) => (
         <div className="flex flex-wrap gap-1">
           {user.role.map((r) => (
-             <span key={r} className="inline-flex items-center rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground border border-border capitalize">
+             <span key={r} className="inline-flex items-center rounded-sm bg-secondary/50 px-1.5 py-0 text-[10px] font-medium text-secondary-foreground border border-border/50 capitalize">
                {r}
              </span>
           ))}
@@ -133,7 +231,8 @@ export default function UsersListPage() {
         <StatusBadge 
           status={user.status === 'active' ? 'success' : user.status === 'suspended' ? 'error' : 'warning'} 
           label={user.status}
-          className="capitalize"
+          variant="flat"
+          className="capitalize text-[10px]"
         />
       )
     },
@@ -142,23 +241,24 @@ export default function UsersListPage() {
       header: 'Actions',
       className: 'text-right',
       render: (user) => (
-        <div className="flex justify-end gap-1">
+        <div className="flex justify-end gap-1 opacity-60 hover:opacity-100 transition-opacity">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => navigate(`/users/${user.id}`)}
             title="View Details"
+            className="h-8 w-8 p-0"
           >
-            <Eye className="h-4 w-4" />
+            <Eye className="h-3.5 w-3.5" />
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setDeleteId(user.id)}
             title="Delete User"
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50/10"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       )
@@ -206,24 +306,83 @@ export default function UsersListPage() {
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={data}
-        isLoading={isLoading}
-        meta={meta}
-        onPageChange={goToPage}
-        onLimitChange={changeLimit}
-        emptyMessage={search ? `No users matching "${search}"` : 'No users found'}
-        emptyIcon={<UserPlus className="h-6 w-6 text-muted-foreground/50" />}
-        emptyAction={
-          !search ? (
-            <Button size="sm" variant="outline" onClick={() => navigate('/users/create')}>
-              <UserPlus className="mr-2 h-3.5 w-3.5" /> Create your first user
-            </Button>
-          ) : undefined
-        }
-      />
+      <div className="relative">
+        <DataTable
+          columns={columns}
+          data={data}
+          isLoading={isLoading}
+          meta={meta}
+          onPageChange={goToPage}
+          onLimitChange={changeLimit}
+          emptyMessage={search ? `No users matching "${search}"` : 'No users found'}
+          emptyIcon={<UserPlus className="h-6 w-6 text-muted-foreground/50" />}
+          emptyAction={
+            !search ? (
+              <Button size="sm" variant="outline" onClick={() => navigate('/users/create')}>
+                <UserPlus className="mr-2 h-3.5 w-3.5" /> Create your first user
+              </Button>
+            ) : undefined
+          }
+        />
 
+        {/* Selection Toolbar */}
+        {selectedIds.length > 0 && (
+          <div className="sticky bottom-6 mt-4 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/10 p-4 backdrop-blur-md shadow-lg animate-in slide-in-from-bottom-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-semibold text-primary">
+                {selectedIds.length} users selected
+              </span>
+              <div className="h-4 w-[1px] bg-primary/20" />
+              <div className="flex gap-1">
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 gap-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+                  onClick={() => setBulkStatusMode('active')}
+                >
+                  <RefreshCcw className="h-3.5 w-3.5" /> Activate
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 gap-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50"
+                  onClick={() => setBulkStatusMode('suspended')}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Suspend
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 gap-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                  onClick={() => setShowBulkRoleModal(true)}
+                >
+                  <Eye className="h-3.5 w-3.5" /> Assign Role
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+               <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 text-xs font-medium text-red-600 hover:bg-red-50"
+                  onClick={() => setBulkDeleteConfirm(true)}
+                >
+                  Delete Selected
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-8 text-xs bg-white"
+                  onClick={() => setSelectedIds([])}
+                >
+                  Clear
+                </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dialogs */}
       <ConfirmDialog
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
@@ -232,6 +391,49 @@ export default function UsersListPage() {
         message="Are you sure you want to permanently delete this user? This action cannot be undone."
         confirmLabel="Delete User"
         variant="danger"
+      />
+
+      <ConfirmDialog
+        open={!!bulkStatusMode}
+        onClose={() => setBulkStatusMode(null)}
+        onConfirm={() => bulkStatusMode && handleBulkStatusUpdate(bulkStatusMode)}
+        title={bulkStatusMode === 'active' ? 'Activate Users' : 'Suspend Users'}
+        message={`Are you sure you want to ${bulkStatusMode} ${selectedIds.length} selected users?`}
+        confirmLabel={bulkStatusMode === 'active' ? 'Activate' : 'Suspend'}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Multiple Users"
+        message={`Are you sure you want to delete ${selectedIds.length} selected users? This will perform a soft-delete.`}
+        confirmLabel="Delete Users"
+        variant="danger"
+      />
+
+      {/* Bulk Role Modal */}
+      <ConfirmDialog
+        open={showBulkRoleModal}
+        onClose={() => setShowBulkRoleModal(false)}
+        onConfirm={handleBulkRoleAssign}
+        title="Assign Role to Selected Users"
+        confirmLabel="Assign Role"
+        message={
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">Select a role to assign to all {selectedIds.length} selected users. This will add the role to their existing roles.</p>
+            <select 
+              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={selectedRoleId}
+              onChange={(e) => setSelectedRoleId(e.target.value)}
+            >
+              <option value="">Select a role...</option>
+              {roles.map((r: any) => (
+                <option key={r._id} value={r._id}>{r.name} ({r.slug})</option>
+              ))}
+            </select>
+          </div>
+        }
       />
     </div>
   );

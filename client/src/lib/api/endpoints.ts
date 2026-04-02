@@ -43,7 +43,10 @@ export const ADMIN_USERS = {
   REMOVE_ROLES: (id: string) => `/admin/users/${id}/roles`,
   SOFT_DELETE: (id: string) => `/admin/users/${id}/soft`,
   HARD_DELETE: (id: string) => `/admin/users/${id}`,
-  RESTORE: (id: string) => `/admin/users/${id}/restore`,
+  RESTORE: (id: string) => `/admin/users/restore/${id}`,
+  BULK_STATUS: '/admin/users/bulk/status',
+  BULK_ROLES: '/admin/users/bulk/roles',
+  BULK_DELETE: '/admin/users/bulk',
 } as const;
 
 // ── Sessions & Security ─────────────────────────────────
@@ -71,6 +74,7 @@ export const GROUPS = {
 
 // ── System Config ───────────────────────────────────────
 export const SETTINGS = {
+  PUBLIC_CONFIG: '/public/config',
   LIST: '/admin/settings',
   BY_CATEGORY: (cat: string) => `/admin/settings/category/${cat}`,
   BY_KEY: (key: string) => `/admin/settings/key/${key}`,
@@ -118,6 +122,8 @@ export const ANALYTICS = {
   USERS_CHART: '/admin/analytics/users/chart',
   LOGINS: '/admin/analytics/logins',
   ROLES: '/admin/analytics/roles',
+  HISTORY: '/admin/analytics/history',
+  CHURN_PREDICTION: '/admin/analytics/churn-prediction',
 } as const;
 
 // ── Social Auth ─────────────────────────────────────────
@@ -147,6 +153,8 @@ export const ROLES = {
   UPDATE: (id: string) => `/roles/${id}`,
   DELETE: (id: string) => `/roles/${id}`,
   PERMISSIONS: (id: string) => `/roles/${id}/permissions`,
+  MATRIX: '/roles/matrix',
+  SYNC_MATRIX: '/roles/matrix/sync',
   ASSIGN_PERMISSIONS: (id: string) => `/roles/${id}/permissions`,
   REMOVE_PERMISSIONS: (id: string) => `/roles/${id}/permissions`,
 } as const;
@@ -180,6 +188,7 @@ export const NOTIFICATIONS = {
   UNREAD_COUNT: '/notifications/unread-count',
   MARK_READ: (id: string) => `/notifications/${id}/read`,
   MARK_ALL_READ: '/notifications/read-all',
+  PERFORM_ACTION: (id: string) => `/notifications/${id}/action`,
   DELETE: (id: string) => `/notifications/${id}`,
   DELETE_ALL: '/notifications',
 } as const;

@@ -11,12 +11,16 @@ const DEFAULTS: Array<{ key: string; value: any; category: string; description: 
     // App settings
     { key: 'app.site_name', value: 'NestJS App', category: 'app', description: 'Application display name' },
     { key: 'app.logo_url', value: '', category: 'app', description: 'Application logo URL' },
+    { key: 'app.favicon_url', value: '', category: 'app', description: 'Application favicon URL' },
+    { key: 'app.primary_color', value: '#0f172a', category: 'app', description: 'Primary branding color (Hex)' },
+    { key: 'app.accent_color', value: '#6366f1', category: 'app', description: 'Accent branding color (Hex)' },
     { key: 'app.support_email', value: 'support@app.com', category: 'app', description: 'Support contact email' },
     { key: 'app.maintenance_mode', value: false, category: 'app', description: 'Enable maintenance mode' },
     { key: 'app.announcement_enabled', value: false, category: 'app', description: 'Show site-wide announcement banner' },
     { key: 'app.announcement_message', value: '', category: 'app', description: 'Announcement banner text' },
     { key: 'app.announcement_type', value: 'info', category: 'app', description: 'Banner type: info, warning, success, error' },
     { key: 'app.announcement_dismissible', value: true, category: 'app', description: 'Allow users to dismiss the banner' },
+    { key: 'app.custom_css', value: '', category: 'app', description: 'Custom CSS for global white-labeling branding' },
 
     // Auth settings
     { key: 'auth.access_token_ttl', value: '15m', category: 'auth', description: 'Access token TTL' },
@@ -25,6 +29,7 @@ const DEFAULTS: Array<{ key: string; value: any; category: string; description: 
     { key: 'auth.max_login_attempts', value: 5, category: 'auth', description: 'Max failed login attempts before lock' },
     { key: 'auth.lock_duration_minutes', value: 30, category: 'auth', description: 'Account lock duration in minutes' },
     { key: 'auth.require_email_verification', value: true, category: 'auth', description: 'Require email verification to login' },
+    { key: 'auth.registration_enabled', value: true, category: 'auth', description: 'Enable public registration' },
 
     // Email settings
     { key: 'email.smtp_host', value: '', category: 'email', description: 'SMTP server hostname' },

@@ -66,6 +66,20 @@ export class User {
     @Prop()
     password_changed_at: Date;
 
+    // WebAuthn
+    @Prop({ type: String })
+    current_challenge: string;
+
+    @Prop({ type: [{
+        credentialID: { type: Buffer },
+        credentialPublicKey: { type: Buffer },
+        counter: { type: Number },
+        credentialDeviceType: { type: String },
+        credentialBackedUp: { type: Boolean },
+        transports: { type: [String] },
+    }], default: [] })
+    authenticators: any[];
+
     // Tracking
     @Prop()
     last_login_at: Date;
@@ -80,6 +94,9 @@ export class User {
     // Custom fields (key-value pairs defined by admin)
     @Prop({ type: Object, default: {} })
     custom_fields: Record<string, any>;
+
+    @Prop({ default: false })
+    requires_password_change: boolean;
 
     // Soft delete
     @Prop({ default: false })

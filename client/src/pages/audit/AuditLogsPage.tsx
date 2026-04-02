@@ -60,20 +60,49 @@ export default function AuditLogsPage() {
     fetchLogs();
   }, [page, limit, debouncedSearch]);
 
-  const handleExport = async (format: 'json' | 'csv') => {
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const [exportConfig, setExportConfig] = useState({
+    date_from: '',
+    date_to: '',
+    fields: ['user_email', 'action', 'method', 'status_code', 'created_at', 'endpoint'],
+  });
+
+  const AVAILABLE_FIELDS = [
+    'user_id', 'user_email', 'action', 'target_type', 'target_id', 
+    'description', 'method', 'endpoint', 'status_code', 'ip_address', 
+    'user_agent', 'created_at'
+  ];
+
+  const handleExport = async () => {
     try {
-      const endpoint = format === 'json' ? AUDIT.EXPORT_JSON : AUDIT.EXPORT_CSV;
-      const res = await api.get(endpoint, { responseType: 'blob' });
+      const endpoint = exportFormat === 'json' ? AUDIT.EXPORT_JSON : AUDIT.EXPORT_CSV;
+      const params = {
+        ...exportConfig,
+        fields: exportConfig.fields.join(','),
+      };
+      
+      const res = await api.get(endpoint, { params, responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `audit_logs_${new Date().toISOString()}.${format}`);
+      link.setAttribute('download', `audit_logs_${new Date().toISOString()}.${exportFormat}`);
       document.body.appendChild(link);
       link.click();
-      toast.success(`Audit logs exported as ${format.toUpperCase()}`);
+      toast.success(`Audit logs exported as ${exportFormat.toUpperCase()}`);
+      setExportModalOpen(false);
     } catch (error) {
       handleApiError(error, 'Export failed');
     }
+  };
+
+  const toggleField = (field: string) => {
+    setExportConfig(prev => ({
+      ...prev,
+      fields: prev.fields.includes(field)
+        ? prev.fields.filter(f => f !== field)
+        : [...prev.fields, field]
+    }));
   };
 
   const getStatusColor = (code: number) => {
@@ -153,14 +182,54 @@ export default function AuditLogsPage() {
           <p className="text-sm text-muted-foreground">Detailed record of system activities and security events</p>
         </div>
         <div className="flex gap-2">
-           <Button variant="outline" onClick={() => handleExport('csv')}>
+           <Button variant="outline" onClick={() => { setExportFormat('csv'); setExportModalOpen(true); }}>
               <Download className="mr-2 h-4 w-4" /> Export CSV
            </Button>
-           <Button variant="outline" onClick={() => handleExport('json')}>
+           <Button variant="outline" onClick={() => { setExportFormat('json'); setExportModalOpen(true); }}>
               <Download className="mr-2 h-4 w-4" /> Export JSON
            </Button>
         </div>
       </div>
+
+      {/* Export Configuration Modal */}
+      <Modal open={exportModalOpen} onClose={() => setExportModalOpen(false)}>
+        <ModalHeader onClose={() => setExportModalOpen(false)}>Configure {exportFormat.toUpperCase()} Export</ModalHeader>
+        <ModalBody className="space-y-6">
+           <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Date From</label>
+                 <Input type="date" value={exportConfig.date_from} onChange={e => setExportConfig(prev => ({ ...prev, date_from: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Date To</label>
+                 <Input type="date" value={exportConfig.date_to} onChange={e => setExportConfig(prev => ({ ...prev, date_to: e.target.value }))} />
+              </div>
+           </div>
+
+           <div className="space-y-3">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Target Fields (Column Selection)</label>
+              <div className="grid grid-cols-2 gap-2 border rounded-lg p-3 bg-slate-50/50">
+                 {AVAILABLE_FIELDS.map(field => (
+                    <label key={field} className="flex items-center gap-2 cursor-pointer group">
+                       <input 
+                         type="checkbox" 
+                         className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
+                         checked={exportConfig.fields.includes(field)}
+                         onChange={() => toggleField(field)}
+                       />
+                       <span className="text-[11px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors uppercase">
+                          {field.replace('_', ' ')}
+                       </span>
+                    </label>
+                 ))}
+              </div>
+           </div>
+        </ModalBody>
+        <ModalFooter>
+           <Button variant="ghost" onClick={() => setExportModalOpen(false)}>Cancel</Button>
+           <Button onClick={handleExport}>Generate Export</Button>
+        </ModalFooter>
+      </Modal>
 
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
@@ -184,8 +253,8 @@ export default function AuditLogsPage() {
             isLoading={isLoading}
             emptyMessage="No activity logs found."
             meta={meta}
-            onPageChange={goToPage}
-            onLimitChange={changeLimit}
+            onPageChange={(p) => goToPage(p)}
+            onLimitChange={(l) => changeLimit(l)}
           />
         </CardContent>
       </Card>

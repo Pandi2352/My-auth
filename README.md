@@ -20,6 +20,7 @@ A production-ready, full-stack user management boilerplate built with **NestJS 1
 - **Rate limiting** via `@nestjs/throttler`
 - **Admin impersonation** — impersonate any user with a banner, short-lived token, and one-click exit
 - **Idle session timeout** — warning modal + auto-logout after inactivity
+- **WebAuthn (Passkeys)** — hardware-backed authentication (Yubikeys, FaceID, TouchID) with full registration, management and passwordless login flow
 - **Cookie consent banner** (GDPR)
 
 ### Social Login (OAuth2)
@@ -142,6 +143,7 @@ A production-ready, full-stack user management boilerplate built with **NestJS 1
 | Forms | React Hook Form + Zod |
 | Charts | Recharts (Area, Bar, Pie, Line) |
 | Real-time | Socket.IO (WebSocket gateway for notifications) |
+| WebAuthn | @simplewebauthn/server, @simplewebauthn/browser |
 | Logging | Winston (console + file with rotation) |
 | HTTP | Axios with interceptors (auto-refresh, error handling) |
 | Email | Nodemailer (SMTP) |
@@ -333,6 +335,8 @@ This starts MongoDB and the NestJS server in containers.
 | `RECAPTCHA_SECRET_KEY` | Google reCAPTCHA secret key | — |
 | `CORS_ORIGIN` | Allowed origins (comma-separated) | `*` |
 | `SWAGGER_ENABLED` | Enable Swagger docs | `true` |
+| `WEBAUTHN_RP_ID` | WebAuthn Relying Party ID | `localhost` |
+| `WEBAUTHN_ORIGIN` | WebAuthn Expected Origin | `http://localhost:5173` |
 
 ### Client
 
@@ -346,6 +350,7 @@ This starts MongoDB and the NestJS server in containers.
 | Module | Base Path | Auth | Description |
 |--------|-----------|------|-------------|
 | Auth | `/auth` | Public | Login, register, verify email, 2FA, password reset, account recovery, impersonation |
+| WebAuthn | `/auth/webauthn` | Public + JWT | Passkey registration, verification, and passwordless login |
 | Social Auth | `/auth/social` | Public + JWT | OAuth flow, linked accounts, link/unlink providers |
 | User Profile | `/user` | JWT | Profile, avatar, email change, password, notifications, data export |
 | Admin Users | `/admin/users` | JWT + Permission | User CRUD, status management, role assignment |
@@ -399,7 +404,7 @@ Permissions are assigned to roles, roles are assigned to users and groups. The f
 | Groups | `/groups` | Group list with member counts and role badges |
 | Group Detail | `/groups/:id` | Members, roles, resolved permissions tabs |
 | Invitations | `/invitations` | Send/resend/revoke invitations |
-| Security | `/security` | 2FA setup, linked accounts, login history, security events timeline |
+| Security | `/security` | 2FA setup, passkey management, linked accounts, login history, security events timeline |
 | Sessions | `/sessions` | Active sessions with terminate single/all |
 | API Keys | `/api-keys` | Generate, view, revoke API keys |
 | Audit Logs | `/audit-logs` | Searchable logs with detail modal, CSV/JSON export |

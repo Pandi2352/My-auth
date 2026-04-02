@@ -12,6 +12,7 @@ import {
   ShieldCheck as ShieldAllow,
   KeyRound,
   Mail,
+  Palette,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -101,6 +102,9 @@ export default function SettingsPage() {
           <TabsTrigger value="app" className="gap-2">
             <Globe className="h-4 w-4" /> General
           </TabsTrigger>
+          <TabsTrigger value="branding" className="gap-2">
+            <Palette className="h-4 w-4" /> Branding
+          </TabsTrigger>
           <TabsTrigger value="auth" className="gap-2">
             <KeyRound className="h-4 w-4" /> Auth
           </TabsTrigger>
@@ -117,9 +121,17 @@ export default function SettingsPage() {
 
         <div className="mt-6">
           <TabsContent value="app">
-            <AppSettings
+            <GeneralSettings
               settings={byCategory('app')}
-              onSave={(v) => handleSave('app', v)}
+              onSave={(v: Record<string, any>) => handleSave('app', v)}
+              isSaving={savingCategory === 'app'}
+            />
+          </TabsContent>
+
+          <TabsContent value="branding">
+            <BrandingSettings
+              settings={byCategory('app')}
+              onSave={(v: Record<string, any>) => handleSave('app', v)}
               isSaving={savingCategory === 'app'}
             />
           </TabsContent>
@@ -215,16 +227,16 @@ function ToggleRow({
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// App (General) Settings
+// General Settings
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function AppSettings({ settings, onSave, isSaving }: SectionProps) {
+function GeneralSettings({ settings, onSave, isSaving }: SectionProps) {
   const { values, set } = useSettingsValues(settings);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>General</CardTitle>
-        <CardDescription>Application identity and public metadata</CardDescription>
+        <CardDescription>System identity and operational settings</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -243,19 +255,11 @@ function AppSettings({ settings, onSave, isSaving }: SectionProps) {
           </FieldItem>
         </div>
 
-        <FieldItem label="Logo URL" desc="Full URL to the application logo image">
-          <Input
-            placeholder="https://cdn.example.com/logo.png"
-            value={values['app.logo_url'] ?? ''}
-            onChange={(e) => set('app.logo_url', e.target.value)}
-          />
-        </FieldItem>
-
         <ToggleRow
           label="Maintenance Mode"
           description="Show a maintenance page to all users. Admins can still access the dashboard."
           checked={values['app.maintenance_mode'] ?? false}
-          onChange={(v) => set('app.maintenance_mode', v)}
+          onChange={(v: boolean) => set('app.maintenance_mode', v)}
         />
 
         {/* Announcement Banner */}
@@ -300,6 +304,84 @@ function AppSettings({ settings, onSave, isSaving }: SectionProps) {
             </div>
           )}
         </div>
+
+        <SaveButton onClick={() => onSave(values)} isSaving={isSaving} />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Branding Settings
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function BrandingSettings({ settings, onSave, isSaving }: SectionProps) {
+  const { values, set } = useSettingsValues(settings);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>White-labeling & Branding</CardTitle>
+        <CardDescription>Customize the visual identity of your platform</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldItem label="Logo URL" desc="Primary logo for dashboard and emails">
+            <Input
+              placeholder="https://cdn.example.com/logo.png"
+              value={values['app.logo_url'] ?? ''}
+              onChange={(e) => set('app.logo_url', e.target.value)}
+            />
+          </FieldItem>
+          <FieldItem label="Favicon URL" desc="Icon shown in browser tab">
+            <Input
+              placeholder="https://cdn.example.com/favicon.ico"
+              value={values['app.favicon_url'] ?? ''}
+              onChange={(e) => set('app.favicon_url', e.target.value)}
+            />
+          </FieldItem>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldItem label="Primary Color" desc="Core brand color (Sidebar, Buttons)">
+            <div className="flex gap-2">
+              <Input
+                type="color"
+                className="h-10 w-12 p-0 border-none bg-transparent"
+                value={values['app.primary_color'] ?? '#0f172a'}
+                onChange={(e) => set('app.primary_color', e.target.value)}
+              />
+              <Input
+                value={values['app.primary_color'] ?? '#0f172a'}
+                onChange={(e) => set('app.primary_color', e.target.value)}
+                className="flex-1 font-mono text-xs uppercase"
+              />
+            </div>
+          </FieldItem>
+          <FieldItem label="Accent Color" desc="Highlights, active states, and links">
+            <div className="flex gap-2">
+              <Input
+                type="color"
+                className="h-10 w-12 p-0 border-none bg-transparent"
+                value={values['app.accent_color'] ?? '#6366f1'}
+                onChange={(e) => set('app.accent_color', e.target.value)}
+              />
+              <Input
+                value={values['app.accent_color'] ?? '#6366f1'}
+                onChange={(e) => set('app.accent_color', e.target.value)}
+                className="flex-1 font-mono text-xs uppercase"
+              />
+            </div>
+          </FieldItem>
+        </div>
+
+        <FieldItem label="Custom CSS" desc="Inject global CSS rules to override default aesthetics (be careful!)">
+          <textarea
+            className="mt-1 block min-h-[200px] w-full rounded-md border border-input bg-muted/20 px-3 py-2 font-mono text-xs focus:ring-2 focus:ring-ring outline-none"
+            value={values['app.custom_css'] ?? ''}
+            onChange={(e) => set('app.custom_css', e.target.value)}
+            placeholder="/* e.g. .sidebar { background: linear-gradient(...) } */"
+          />
+        </FieldItem>
 
         <SaveButton onClick={() => onSave(values)} isSaving={isSaving} />
       </CardContent>
@@ -367,6 +449,13 @@ function AuthSettings({ settings, onSave, isSaving }: SectionProps) {
           description="Users must verify their email before they can log in"
           checked={values['auth.require_email_verification'] ?? true}
           onChange={(v) => set('auth.require_email_verification', v)}
+        />
+
+        <ToggleRow
+          label="Public Registration"
+          description="Allow anyone to create an account. If disabled, only admin created or invited users can access."
+          checked={values['auth.registration_enabled'] ?? true}
+          onChange={(v) => set('auth.registration_enabled', v)}
         />
 
         <SaveButton onClick={() => onSave(values)} isSaving={isSaving} />

@@ -8,9 +8,10 @@ export enum NotificationType {
     SUCCESS = 'success',
     WARNING = 'warning',
     ERROR = 'error',
+    ACTION = 'action',
 }
 
-@Schema({ timestamps: { createdAt: 'created_at', updatedAt: false } })
+@Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
 export class InAppNotification {
     @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
     user_id: Types.ObjectId;
@@ -31,7 +32,21 @@ export class InAppNotification {
     @Prop({ default: false, index: true })
     is_read: boolean;
 
+    /** For actionable notifications (Approve/Reject) */
+    @Prop({ type: String, enum: ['approve_reject', 'view_details'], default: null })
+    action_type: string;
+
+    @Prop({ type: Types.ObjectId, default: null })
+    target_id: Types.ObjectId;
+
+    @Prop({ default: false })
+    is_action_taken: boolean;
+
+    @Prop({ type: String, enum: ['approved', 'rejected', null], default: null })
+    action_result: string;
+
     created_at: Date;
+    updated_at: Date;
 }
 
 export const InAppNotificationSchema = SchemaFactory.createForClass(InAppNotification);

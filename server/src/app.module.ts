@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -44,6 +45,7 @@ import { IpBlockGuard } from './common/guards/ip-block.guard';
       ttl: 60000,
       limit: 100,
     }]),
+    ScheduleModule.forRoot(),
     AuthModule,
     UserModule,
     PermissionModule,

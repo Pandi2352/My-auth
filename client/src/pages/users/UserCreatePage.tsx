@@ -26,6 +26,7 @@ export default function UserCreatePage() {
         phone: values.phone,
         status: values.status,
         role_ids: values.roleIds,
+        requires_password_change: values.requiresPasswordChange,
       };
       await api.post(ADMIN_USERS.CREATE, payload);
       toast.success('User created successfully');

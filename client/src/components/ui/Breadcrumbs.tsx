@@ -61,6 +61,7 @@ export function Breadcrumbs() {
     <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
       <Link
         to="/dashboard"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         className="flex items-center text-muted-foreground hover:text-foreground transition-colors"
       >
         <Home className="h-3.5 w-3.5" />
@@ -77,6 +78,7 @@ export function Breadcrumbs() {
             ) : (
               <Link
                 to={crumb.path}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 {crumb.label}

@@ -17,12 +17,12 @@ import {
   UsersRound,
   Monitor,
   Megaphone,
-  ChevronLeft,
   Hexagon,
   ShieldCheck,
   Star,
   ListChecks,
   FileText,
+  Layers,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ElementType> = {
@@ -41,6 +41,7 @@ const iconMap: Record<string, React.ElementType> = {
   ShieldCheck,
   ListChecks,
   FileText,
+  Layers,
 };
 
 interface NavSection {
@@ -61,6 +62,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'Users', path: '/users', icon: 'Users', permission: 'user:read' },
       { label: 'Roles', path: '/roles', icon: 'Shield', permission: 'role:read' },
+      { label: 'Matrix', path: '/admin/permissions/matrix', icon: 'Layers', permission: 'role:update' },
       { label: 'Groups', path: '/groups', icon: 'UsersRound', permission: 'group:read' },
       { label: 'Invitations', path: '/invitations', icon: 'UserPlus', permission: 'invitation:read' },
     ],
@@ -86,12 +88,10 @@ const navSections: NavSection[] = [
   },
 ];
 
-interface SidebarProps {
-  collapsed: boolean;
-  onToggle: () => void;
-}
+import { useSidebar } from '@/contexts/SidebarContext';
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar() {
+  const { collapsed } = useSidebar();
   const { can } = usePermissions();
   const { favorites, toggle: toggleFav, isFavorite } = useFavorites();
   const { siteName, logoUrl } = useAppSettings();
@@ -113,23 +113,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-30 flex flex-col border-r border-border bg-background transition-all duration-200',
-        collapsed ? 'w-16' : 'w-60',
+        'fixed inset-y-0 left-0 z-30 flex flex-col border-r border-border bg-slate-50 dark:bg-zinc-950 transition-[width] duration-100 ease-linear',
+        collapsed ? 'w-16' : 'w-64',
       )}
     >
       {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center border-b border-border px-3">
+      <div className="flex h-14 shrink-0 items-center border-b border-border px-3">
         {collapsed ? (
-          <button
-            onClick={onToggle}
-            className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white overflow-hidden"
-          >
+          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white overflow-hidden">
             {logoUrl ? (
               <img src={logoUrl} alt={siteName} className="h-9 w-9 object-cover" />
             ) : (
               <Hexagon className="h-5 w-5" />
             )}
-          </button>
+          </div>
         ) : (
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -140,25 +137,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   <Hexagon className="h-4 w-4" />
                 )}
               </div>
-              <span className="text-base font-bold text-foreground tracking-tight">{siteName}</span>
+              <span className="text-sm font-bold text-foreground tracking-tight">{siteName}</span>
             </div>
-            <button
-              onClick={onToggle}
-              className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
           </div>
         )}
       </div>
 
       {/* Nav sections */}
-      <nav className="flex-1 overflow-y-auto py-3">
+      <nav className="flex-1 overflow-y-auto py-3 custom-sidebar-scrollbar px-2">
         {/* Favorites section */}
         {favoriteItems.length > 0 && (
           <div className="mb-3">
             {!collapsed && (
-              <p className="mb-1 px-4 text-[10px] font-semibold uppercase tracking-widest text-amber-500">
+              <p className="mb-1.5 mt-2 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-amber-600/60 dark:text-amber-500/50">
                 Favorites
               </p>
             )}
@@ -187,7 +178,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {filteredSections.map((section, sectionIdx) => (
           <div key={section.label} className={sectionIdx > 0 || favoriteItems.length > 0 ? 'mt-3' : ''}>
             {!collapsed && (
-              <p className="mb-1 px-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              <p className="mb-0.5 mt-3 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50">
                 {section.label}
               </p>
             )}
@@ -209,19 +200,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         ))}
       </nav>
-
-      {/* Collapse toggle */}
-      {!collapsed && (
-        <div className="shrink-0 border-t border-border p-3">
-          <button
-            onClick={onToggle}
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span>Collapse</span>
-          </button>
-        </div>
-      )}
     </aside>
   );
 }
@@ -246,11 +224,12 @@ function SidebarNavItem({
         to={item.path}
         className={({ isActive }) =>
           cn(
-            'relative flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium transition-all duration-150',
+            'relative flex items-center gap-3 rounded-md px-3.5 py-1.5 text-[13px] font-medium transition-all duration-100',
             isActive
               ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-            collapsed && 'justify-center px-0',
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-accent/40 hover:text-foreground',
+            collapsed && 'justify-center px-0 py-2',
+            'overflow-hidden whitespace-nowrap',
           )
         }
         title={collapsed ? item.label : undefined}
@@ -260,7 +239,7 @@ function SidebarNavItem({
             {isActive && (
               <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-primary" />
             )}
-            <Icon className={cn('shrink-0', collapsed ? 'h-5 w-5' : 'h-4 w-4')} />
+            <Icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="flex-1">{item.label}</span>}
           </>
         )}

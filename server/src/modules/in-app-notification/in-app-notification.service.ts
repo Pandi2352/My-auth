@@ -97,4 +97,38 @@ export class InAppNotificationService {
     async deleteAll(userId: string): Promise<void> {
         await this.notifModel.deleteMany({ user_id: new Types.ObjectId(userId) });
     }
+
+    async performAction(userId: string, id: string, result: 'approved' | 'rejected') {
+        const notification = await this.notifModel.findOne({
+            _id: id,
+            user_id: new Types.ObjectId(userId),
+        });
+
+        if (!notification) {
+            throw new Error('Notification not found');
+        }
+
+        if (notification.is_action_taken) {
+            throw new Error('Action already taken on this notification');
+        }
+
+        // Logic for what happens when approved/rejected would go here
+        // For now, we update the notification status
+        await this.notifModel.updateOne(
+            { _id: id },
+            {
+                $set: {
+                    is_action_taken: true,
+                    action_result: result,
+                    is_read: true,
+                },
+            },
+        );
+
+        return {
+            success: true,
+            message: `Request ${result} successfully`,
+            result,
+        };
+    }
 }

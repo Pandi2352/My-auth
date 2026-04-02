@@ -109,4 +109,31 @@ export class UserService {
             { $pull: { roles: roleId } },
         );
     }
+
+    // ── Bulk Operations ──────────────────────────────────────
+
+    async bulkUpdateStatus(userIds: string[], status: any): Promise<void> {
+        await this.userModel.updateMany(
+            { _id: { $in: userIds } },
+            { $set: { status } },
+        );
+    }
+
+    async bulkAssignRoles(userIds: string[], roleIds: string[]): Promise<void> {
+        await this.userModel.updateMany(
+            { _id: { $in: userIds } },
+            { $addToSet: { roles: { $each: roleIds } } },
+        );
+    }
+
+    async bulkDelete(userIds: string[], soft: boolean = true): Promise<void> {
+        if (soft) {
+            await this.userModel.updateMany(
+                { _id: { $in: userIds } },
+                { $set: { is_deleted: true, deleted_at: new Date() } },
+            );
+        } else {
+            await this.userModel.deleteMany({ _id: { $in: userIds } });
+        }
+    }
 }

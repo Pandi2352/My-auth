@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,8 +10,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Captcha, type CaptchaHandle, isCaptchaEnabled } from '@/components/ui/Captcha';
 import { PasswordStrengthMeter } from '@/components/ui/PasswordStrengthMeter';
+import { PageLoader } from '@/components/ui/PageLoader';
+import { AlertTriangle } from 'lucide-react';
 import api from '@/lib/api/client';
-import { AUTH } from '@/lib/api/endpoints';
+import { AUTH, SETTINGS } from '@/lib/api/endpoints';
 import { handleApiError } from '@/lib/api/handleError';
 
 const registerSchema = z.object({
@@ -31,7 +33,24 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const captchaRef = useRef<CaptchaHandle>(null);
+
+  // Check if public registration is allowed
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const res = await api.get(SETTINGS.PUBLIC_CONFIG);
+        setRegistrationEnabled(res.data.registration_enabled);
+      } catch {
+        setRegistrationEnabled(true); // fail-open
+      } finally {
+        setChecking(false);
+      }
+    };
+    checkConfig();
+  }, []);
 
   const {
     register,
@@ -69,6 +88,27 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  if (checking) return <PageLoader />;
+
+  if (!registrationEnabled) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col items-center gap-4 text-center py-6">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+            <AlertTriangle className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Registration Disabled</h2>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Public registration is currently disabled by the administrator. Please contact your admin to receive an invitation.
+          </p>
+          <Link to="/login" className="text-sm font-medium text-blue-600 hover:text-blue-500 mt-2">
+            ← Back to Login
+          </Link>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

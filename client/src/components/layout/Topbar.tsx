@@ -1,18 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { LogOut, User, ChevronDown, Sun, Moon, Search, Settings, ShieldCheck, UserCog, X } from 'lucide-react';
+import { LogOut, User, ChevronDown, Sun, Moon, Search, Settings, ShieldCheck, UserCog, X, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { useTheme } from '@/hooks/useTheme';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 
-interface TopbarProps {
-  sidebarCollapsed: boolean;
-}
+import { useSidebar } from '@/contexts/SidebarContext';
 
-export function Topbar({ sidebarCollapsed }: TopbarProps) {
+export function Topbar() {
+  const { collapsed: sidebarCollapsed, toggle: onToggle } = useSidebar();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -68,8 +67,8 @@ export function Topbar({ sidebarCollapsed }: TopbarProps) {
       {impersonatingUser && (
         <div
           className={cn(
-            'fixed top-0 right-0 z-30 flex h-10 items-center justify-center gap-3 bg-amber-500 text-white text-sm font-medium transition-all duration-200',
-            sidebarCollapsed ? 'left-16' : 'left-60',
+            'fixed top-0 right-0 z-30 flex h-10 items-center justify-center gap-3 bg-amber-500 text-white text-sm font-medium transition-[left] duration-100 ease-linear',
+            sidebarCollapsed ? 'left-16' : 'left-64',
           )}
         >
           <UserCog className="h-4 w-4" />
@@ -86,20 +85,39 @@ export function Topbar({ sidebarCollapsed }: TopbarProps) {
         </div>
       )}
 
-      <header
+    <header
+      className={cn(
+        'fixed top-0 left-0 right-0 z-20 flex h-14 items-center justify-between border-b border-border bg-slate-50/90 dark:bg-zinc-950/90 backdrop-blur-md transition-all duration-100 ease-linear',
+        impersonatingUser && 'top-10',
+      )}
+    >
+      {/* Container wrapper for content tracking the sidebar */}
+      <div
         className={cn(
-          'fixed right-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm transition-all duration-200',
-          sidebarCollapsed ? 'left-16' : 'left-60',
-          impersonatingUser ? 'top-10' : 'top-0',
+          'flex h-full w-full items-center justify-between transition-[padding-left] duration-100 ease-linear',
+          sidebarCollapsed ? 'pl-16' : 'pl-64',
         )}
       >
-        {/* Left: Breadcrumbs */}
-        <div className="flex items-center pl-6">
-          <Breadcrumbs />
+        {/* Left: Toggle & Breadcrumbs */}
+        <div className="flex items-center pl-2">
+          <button
+            onClick={onToggle}
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="h-4.5 w-4.5" />
+            ) : (
+              <PanelLeftClose className="h-4.5 w-4.5" />
+            )}
+          </button>
+          <div className="ml-2">
+            <Breadcrumbs />
+          </div>
         </div>
 
-      {/* Right: Actions */}
-      <div className="flex items-center gap-1 pr-4">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1 pr-3">
         {/* Search trigger */}
         <button
           onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
@@ -191,9 +209,10 @@ export function Topbar({ sidebarCollapsed }: TopbarProps) {
           )}
         </div>
       </div>
-    </header>
-    </>
-  );
+    </div>
+  </header>
+  </>
+);
 }
 
 function ThemeToggle() {

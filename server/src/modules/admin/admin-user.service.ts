@@ -134,6 +134,7 @@ export class AdminUserService {
             phone: dto.phone,
             status: dto.status || UserStatus.ACTIVE,
             is_verified: dto.is_verified !== undefined ? dto.is_verified : true,
+            requires_password_change: dto.requires_password_change || false,
         };
 
         // Assign roles if provided
@@ -443,5 +444,92 @@ export class AdminUserService {
             exported_at: new Date().toISOString(),
             users,
         };
+    }
+
+    // ── Bulk Operations ──────────────────────────────────────
+
+    async bulkUpdateStatus(userIds: string[], status: UserStatus) {
+        if (!userIds || userIds.length === 0) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.BAD_REQUEST,
+                error: 'invalid_request',
+                error_description: 'No users selected',
+            });
+        }
+
+        const updateData: any = { status };
+        if (status === UserStatus.ACTIVE) {
+            updateData.failed_login_attempts = 0;
+            updateData.locked_until = null;
+        }
+
+        const objectIds = userIds.map(id => new Types.ObjectId(id));
+
+        await this.userModel.updateMany(
+            { _id: { $in: objectIds } },
+            { $set: updateData },
+        );
+
+        return { message: `Successfully updated status for ${userIds.length} users to '${status}'` };
+    }
+
+    async bulkAssignRoles(userIds: string[], roleIds: string[]) {
+        if (!userIds || userIds.length === 0) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.BAD_REQUEST,
+                error: 'invalid_request',
+                error_description: 'No users selected',
+            });
+        }
+
+        // Validate roles
+        const roles = await this.roleModel.find({ _id: { $in: roleIds } });
+        if (roles.length !== roleIds.length) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.BAD_REQUEST,
+                error: 'invalid_roles',
+                error_description: 'One or more role IDs are invalid',
+            });
+        }
+
+        const objectIds = userIds.map(id => new Types.ObjectId(id));
+
+        await this.userModel.updateMany(
+            { _id: { $in: objectIds } },
+            { $addToSet: { roles: { $each: roleIds } } },
+        );
+
+        return { message: `Successfully assigned roles to ${userIds.length} users` };
+    }
+
+    async bulkDelete(userIds: string[], soft: boolean = true) {
+        if (!userIds || userIds.length === 0) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.BAD_REQUEST,
+                error: 'invalid_request',
+                error_description: 'No users selected',
+            });
+        }
+
+        const objectIds = userIds.map(id => new Types.ObjectId(id));
+
+        if (soft) {
+            await this.userModel.updateMany(
+                { _id: { $in: objectIds } },
+                { $set: { is_deleted: true, deleted_at: new Date(), status: UserStatus.INACTIVE } },
+            );
+            // Revoke refresh tokens
+            await this.refreshTokenModel.updateMany(
+                { user_id: { $in: objectIds } },
+                { $set: { is_revoked: true } },
+            );
+        } else {
+            // Delete refresh tokens first
+            await this.refreshTokenModel.deleteMany({ user_id: { $in: objectIds } });
+            // Permanent delete users
+            await this.userModel.deleteMany({ _id: { $in: objectIds } });
+        }
+
+        return { message: `Successfully deleted ${userIds.length} users` };
     }
 }

@@ -6,9 +6,9 @@ import { AlertTriangle } from 'lucide-react';
 interface ConfirmDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: () => any;
   title?: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'danger' | 'primary';
@@ -48,7 +48,7 @@ export function ConfirmDialog({
               <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
           )}
-          <p className="text-sm text-muted-foreground">{message}</p>
+          <div className="text-sm text-muted-foreground">{message}</div>
         </div>
       </ModalBody>
       <ModalFooter>

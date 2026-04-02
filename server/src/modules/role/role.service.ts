@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Role, RoleDocument } from './schemas/role.schema.js';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
@@ -264,5 +264,32 @@ export class RoleService {
             { permissions: permissionId },
             { $pull: { permissions: permissionId } },
         );
+    }
+
+    // ── Permission Matrix ───────────────────────────────────
+
+    async getMatrix() {
+        const [roles, permissions] = await Promise.all([
+            this.roleModel.find({}, { name: 1, slug: 1, permissions: 1, is_system: 1 }).sort({ name: 1 }).lean(),
+            this.permissionService.findAll(),
+        ]);
+
+        return {
+            roles,
+            permissions,
+        };
+    }
+
+    async syncMatrix(changes: { role_id: string; permission_ids: string[] }[]) {
+        const sessions = changes.map(async (change) => {
+            return this.roleModel.findByIdAndUpdate(
+                change.role_id,
+                { $set: { permissions: change.permission_ids.map(id => new Types.ObjectId(id)) } },
+                { returnDocument: 'after' }
+            );
+        });
+
+        await Promise.all(sessions);
+        return { success: true, message: 'Permission matrix synchronized successfully' };
     }
 }

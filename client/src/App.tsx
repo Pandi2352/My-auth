@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute, PublicRoute } from './app/router';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { PageLoader } from './components/ui/PageLoader';
+import { CustomCSSInjector } from './components/ui/CustomCSSInjector';
+import { CommandPalette } from './components/ui/CommandPalette';
 import { useAuthInit } from './hooks/useAuth';
 
 // Auth pages (keep eager — small & critical path)
@@ -15,6 +17,7 @@ const ForgotPasswordPage = lazy(() => import('./app/forgot-password/page'));
 const ResetPasswordPage = lazy(() => import('./app/reset-password/page'));
 const AuthCallbackPage = lazy(() => import('./app/auth-callback/page'));
 const RecoverAccountPage = lazy(() => import('./app/recover-account/page'));
+const ForcePasswordPage = lazy(() => import('./app/force-password/page'));
 
 // Lazy-loaded dashboard pages
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
@@ -38,6 +41,9 @@ const SecurityPage = lazy(() => import('./pages/security/SecurityPage'));
 const AdvertisementsPage = lazy(() => import('./pages/advertisements/AdvertisementsPage'));
 const CustomFieldsPage = lazy(() => import('./pages/custom-fields/CustomFieldsPage'));
 const SystemLogsPage = lazy(() => import('./pages/system-logs/SystemLogsPage'));
+const PermissionMatrixPage = lazy(() => import('./pages/admin/PermissionMatrixPage'));
+const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/legal/TermsPage'));
 
 // Error pages
 const NotFound = lazy(() => import('./pages/errors/NotFound'));
@@ -50,6 +56,8 @@ function App() {
 
   return (
     <Suspense fallback={<PageLoader />}>
+      <CustomCSSInjector />
+      <CommandPalette />
       <Routes>
         {/* Public Routes */}
         <Route element={<PublicRoute />}>
@@ -60,6 +68,9 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/recover-account" element={<RecoverAccountPage />} />
+          <Route path="/force-password" element={<ForcePasswordPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
         </Route>
 
         {/* Protected Routes — wrapped in DashboardLayout */}
@@ -86,6 +97,7 @@ function App() {
             <Route path="/advertisements" element={<AdvertisementsPage />} />
             <Route path="/custom-fields" element={<CustomFieldsPage />} />
             <Route path="/system-logs" element={<SystemLogsPage />} />
+            <Route path="/admin/permissions/matrix" element={<PermissionMatrixPage />} />
             <Route path="/connectors" element={<ConnectorsListPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

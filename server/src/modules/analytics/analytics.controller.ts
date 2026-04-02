@@ -74,4 +74,19 @@ export class AnalyticsController {
     getRoleDistribution() {
         return this.analyticsService.getRoleDistribution();
     }
+
+    @Get('history')
+    @Permissions('analytics:read')
+    @ApiOperation({ summary: 'Get summarized historical data for long ranges' })
+    @ApiQuery({ name: 'days', required: false, type: Number })
+    getSummarizedHistory(@Query('days') days?: string) {
+        return this.analyticsService.getSummarizedHistory(parseInt(days || '365'));
+    }
+
+    @Get('churn-prediction')
+    @Permissions('analytics:read')
+    @ApiOperation({ summary: 'Predictive churn analysis (linear regression)' })
+    getChurnPrediction() {
+        return this.analyticsService.getChurnPrediction();
+    }
 }

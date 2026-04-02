@@ -1,0 +1,61 @@
+{
+  "permissions": [
+    { "module": "user", "actions": ["create", "read", "update", "delete"] },
+    { "module": "role", "actions": ["create", "read", "update", "delete"] },
+    { "module": "permission", "actions": ["create", "read", "update", "delete"] },
+    { "module": "session", "actions": ["read", "delete"] },
+    { "module": "audit", "actions": ["read"] },
+    { "module": "analytics", "actions": ["read"] },
+    { "module": "group", "actions": ["create", "read", "update", "delete"] },
+    { "module": "settings", "actions": ["read", "update"] },
+    { "module": "invitation", "actions": ["create", "read"] },
+    { "module": "connector", "actions": ["create", "read", "update", "delete"] },
+    { "module": "advertisement", "actions": ["create", "read", "update", "delete"] }
+  ],
+  "roles": [
+    {
+      "name": "Super Admin",
+      "slug": "super_admin",
+      "description": "Full system access",
+      "is_system": true,
+      "is_default": false
+    },
+    {
+      "name": "Admin",
+      "slug": "admin",
+      "description": "Administrative access",
+      "is_system": true,
+      "is_default": false
+    },
+    {
+      "name": "Moderator",
+      "slug": "moderator",
+      "description": "Content moderation access",
+      "is_system": false,
+      "is_default": false
+    },
+    {
+      "name": "User",
+      "slug": "user",
+      "description": "Basic user access",
+      "is_system": false,
+      "is_default": true
+    }
+  ],
+  "users": [
+    {
+      "first_name": "Super",
+      "last_name": "Admin",
+      "email": "superadmin@example.com",
+      "password": "AdminPassword123!",
+      "role": "super_admin"
+    },
+    {
+      "first_name": "Dev",
+      "last_name": "User",
+      "email": "dev@example.com",
+      "password": "DevPassword123!",
+      "role": "super_admin"
+    }
+  ]
+}

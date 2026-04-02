@@ -42,4 +42,9 @@ export class AuditLogQueryDto extends PaginationQueryDto {
     @IsOptional()
     @IsString()
     method?: string;
+
+    @ApiPropertyOptional({ example: 'action,user_email,created_at', description: 'Comma-separated list of fields to include' })
+    @IsOptional()
+    @IsString()
+    fields?: string;
 }

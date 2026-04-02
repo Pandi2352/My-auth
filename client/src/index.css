@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  src: url('/fonts/Roboto-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --color-border: hsl(var(--border));
@@ -60,11 +76,45 @@
 }
 
 @layer base {
+  html {
+    font-size: 14px;
+    height: 100%;
+    scrollbar-gutter: stable;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   * {
     border-color: hsl(var(--border));
   }
   body {
     @apply bg-background text-foreground font-sans;
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Custom Scrollbars */
+  .custom-sidebar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s ease;
+  }
+
+  .custom-sidebar-scrollbar:hover {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.15) transparent;
+  }
+
+  /* Webkit-specific */
+  .custom-sidebar-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 10px;
+  }
+
+  .custom-sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.15);
   }
 }
 
@@ -79,4 +129,23 @@
 }
 .animate-in {
   animation: fade-in 150ms ease-out, zoom-in-95 150ms ease-out;
+}
+
+/* Haptic Feedback System */
+@layer utilities {
+  .haptic-touch {
+    @apply transition-all duration-75 active:scale-[0.98] active:brightness-95 active:contrast-125;
+  }
+}
+
+/* Global Haptic Application */
+button, 
+a, 
+[role="button"] {
+  @apply haptic-touch cursor-pointer;
+}
+
+/* Surgical Interactive Elements */
+input, select, textarea {
+  @apply transition-all duration-100 focus:ring-1 focus:ring-slate-900/10 focus:border-slate-900/20 focus:bg-slate-50/10;
 }

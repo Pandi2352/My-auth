@@ -5,6 +5,10 @@ import { SETTINGS } from '@/lib/api/endpoints';
 interface AppSettings {
   siteName: string;
   logoUrl: string;
+  faviconUrl: string;
+  primaryColor: string;
+  accentColor: string;
+  customCss: string;
 }
 
 const CACHE_KEY = 'app_settings_cache';
@@ -29,7 +33,14 @@ export function useAppSettings(): AppSettings {
         }
       }
     } catch {}
-    return { siteName: 'Admin', logoUrl: '' };
+    return { 
+      siteName: 'Admin', 
+      logoUrl: '', 
+      faviconUrl: '',
+      primaryColor: '#0f172a',
+      accentColor: '#6366f1',
+      customCss: '' 
+    };
   });
 
   useEffect(() => {
@@ -43,6 +54,10 @@ export function useAppSettings(): AppSettings {
         const data: AppSettings = {
           siteName: map['app.site_name'] || 'Admin',
           logoUrl: map['app.logo_url'] || '',
+          faviconUrl: map['app.favicon_url'] || '',
+          primaryColor: map['app.primary_color'] || '#0f172a',
+          accentColor: map['app.accent_color'] || '#6366f1',
+          customCss: map['app.custom_css'] || '',
         };
         setSettings(data);
         const cache = { data, timestamp: Date.now() };

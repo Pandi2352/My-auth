@@ -27,6 +27,40 @@ export class RoleController {
         return this.roleService.findAll();
     }
 
+    // ── Permission Matrix ───────────────────────────────────
+
+    @Get('matrix')
+    @Permissions('role:read')
+    @ApiOperation({ summary: 'Get role-permission matrix' })
+    getMatrix() {
+        return this.roleService.getMatrix();
+    }
+
+    @Post('matrix/sync')
+    @Permissions('role:update')
+    @ApiOperation({ summary: 'Synchronize permission matrix changes' })
+    syncMatrix(@Body() dto: { changes: { role_id: string; permission_ids: string[] }[] }) {
+        return this.roleService.syncMatrix(dto.changes);
+    }
+
+    // ── User Role Assignment ────────────────────────────────
+
+    @Post('assign-to-user')
+    @Permissions('role:update')
+    @ApiOperation({ summary: 'Assign roles to a user' })
+    assignToUser(@Body() dto: AssignRolesDto) {
+        return this.roleService.assignRolesToUser(dto.user_id, dto.role_ids);
+    }
+
+    @Post('remove-from-user')
+    @Permissions('role:update')
+    @ApiOperation({ summary: 'Remove roles from a user' })
+    removeFromUser(@Body() dto: AssignRolesDto) {
+        return this.roleService.removeRolesFromUser(dto.user_id, dto.role_ids);
+    }
+
+    // ── Parameterized Routes (Must be at the bottom) ────────
+
     @Get(':id')
     @Permissions('role:read')
     @ApiOperation({ summary: 'Get role by ID (with permissions)' })
@@ -48,8 +82,6 @@ export class RoleController {
         return this.roleService.delete(id);
     }
 
-    // ── Permission Assignment ───────────────────────────────
-
     @Get(':id/permissions')
     @Permissions('role:read')
     @ApiOperation({ summary: 'Get permissions of a role' })
@@ -69,21 +101,5 @@ export class RoleController {
     @ApiOperation({ summary: 'Remove permissions from a role' })
     removePermissions(@Param('id') id: string, @Body() dto: AssignPermissionsDto) {
         return this.roleService.removePermissions(id, dto.permission_ids);
-    }
-
-    // ── User Role Assignment ────────────────────────────────
-
-    @Post('assign-to-user')
-    @Permissions('role:update')
-    @ApiOperation({ summary: 'Assign roles to a user' })
-    assignToUser(@Body() dto: AssignRolesDto) {
-        return this.roleService.assignRolesToUser(dto.user_id, dto.role_ids);
-    }
-
-    @Post('remove-from-user')
-    @Permissions('role:update')
-    @ApiOperation({ summary: 'Remove roles from a user' })
-    removeFromUser(@Body() dto: AssignRolesDto) {
-        return this.roleService.removeRolesFromUser(dto.user_id, dto.role_ids);
     }
 }

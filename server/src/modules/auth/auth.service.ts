@@ -16,6 +16,7 @@ import { UserDocument } from '../user/schemas/user.schema.js';
 import { RoleService } from '../role/role.service.js';
 import { SessionService } from '../session/session.service.js';
 import { NotificationService } from '../notification/notification.service.js';
+import { SystemConfigService } from '../system-config/system-config.service.js';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -32,12 +33,22 @@ export class AuthService {
         private readonly roleService: RoleService,
         private readonly sessionService: SessionService,
         private readonly notificationService: NotificationService,
+        private readonly systemConfigService: SystemConfigService,
         private readonly jwtService: JwtService,
         @InjectModel(RefreshToken.name) private refreshTokenModel: Model<RefreshTokenDocument>,
     ) {}
 
     // ── Register ──────────────────────────────────────────────
     async register(dto: RegisterDto) {
+        const registrationEnabled = await this.systemConfigService.getValue('auth.registration_enabled', true);
+        if (!registrationEnabled) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.FORBIDDEN,
+                error: 'registration_disabled',
+                error_description: 'Public registration is currently disabled by administrator.',
+            });
+        }
+
         const existing = await this.userService.findByEmail(dto.email);
         if (existing) {
             throw new ErrorEntity({
@@ -192,6 +203,18 @@ export class AuthService {
                 http_code: HttpStatus.FORBIDDEN,
                 error: 'account_suspended',
                 error_description: 'Your account has been suspended',
+            });
+        }
+
+        if (user.requires_password_change) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.FORBIDDEN,
+                error: 'password_change_required',
+                error_description: 'For security reasons, you must change your password before accessing the dashboard.',
+                meta_data: { 
+                    user_id: user._id,
+                    email: user.email 
+                }
             });
         }
 
@@ -658,6 +681,44 @@ export class AuthService {
             },
             warning: 'This is an impersonation token. All actions will be logged.',
         };
+    }
+
+    async forcePasswordChange(userId: string, current_pass: string, new_pass: string, ip: string, userAgent: string) {
+        const user = await this.userService.findById(userId);
+        if (!user) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.NOT_FOUND,
+                error: 'user_not_found',
+                error_description: 'User not found',
+            });
+        }
+
+        const isMatch = await this.bcrypt.compareBcryptPassword(current_pass, user.password_hash);
+        if (!isMatch) {
+            throw new ErrorEntity({
+                http_code: HttpStatus.UNAUTHORIZED,
+                error: 'invalid_credentials',
+                error_description: 'Current password does not match',
+            });
+        }
+
+        const password_hash = await this.bcrypt.generateBcryptPassword(new_pass);
+        await this.userService.updateById(userId, {
+            password_hash,
+            requires_password_change: false,
+            password_changed_at: new Date(),
+        });
+
+        // Record security event
+        await this.sessionService.recordSecurityEvent({
+            user_id: user._id.toString(),
+            event_type: 'password_change',
+            description: 'Forced password change upon first login',
+            ip_address: ip,
+            user_agent: userAgent
+        });
+
+        return { message: 'Password updated successfully. You can now log in with your new password.' };
     }
 
     // ── Private Helpers ───────────────────────────────────────

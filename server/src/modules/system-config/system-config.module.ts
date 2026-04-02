@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SystemConfig, SystemConfigSchema } from './schemas/system-config.schema.js';
 import { SystemConfigService } from './system-config.service.js';
 import { SystemConfigController } from './system-config.controller.js';
+import { PublicConfigController } from './public-config.controller.js';
 
 @Module({
     imports: [
@@ -10,7 +11,7 @@ import { SystemConfigController } from './system-config.controller.js';
             { name: SystemConfig.name, schema: SystemConfigSchema },
         ]),
     ],
-    controllers: [SystemConfigController],
+    controllers: [SystemConfigController, PublicConfigController],
     providers: [SystemConfigService],
     exports: [SystemConfigService],
 })

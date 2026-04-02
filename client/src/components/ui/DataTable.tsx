@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { Skeleton } from './Skeleton';
 import { Spinner } from './Spinner';
 import {
   ChevronUp,
@@ -14,7 +15,7 @@ import type { PaginationMeta } from '@/types';
 // ── Column definition ──────────────────────────────────────
 export interface Column<T> {
   key: string;
-  header: string;
+  header: React.ReactNode;
   sortable?: boolean;
   className?: string;
   render?: (row: T) => React.ReactNode;
@@ -166,13 +167,17 @@ export function DataTable<T>({
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-border bg-white">
             {isLoading ? (
-              <tr>
-                <td colSpan={columns.length} className="py-16 text-center">
-                  <Spinner size="md" className="mx-auto" />
-                </td>
-              </tr>
+              [...Array(pageSize)].map((_, i) => (
+                <tr key={i} className="animate-pulse border-b border-border last:border-0">
+                  {columns.map((col) => (
+                    <td key={col.key} className={cn('px-4 py-4', col.className)}>
+                       <Skeleton className={cn("h-4", i % 2 === 0 ? "w-2/3" : "w-1/2")} />
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : !displayData || displayData.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="py-16 text-center">
@@ -207,7 +212,7 @@ export function DataTable<T>({
 
       {/* Pagination footer */}
       {activeMeta && activeMeta.total_pages > 0 && (
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
+        <div className="flex items-center justify-between border-t border-border px-4 py-3 bg-white">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Rows per page:</span>
             <select

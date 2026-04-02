@@ -1,16 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { User, UserDocument } from '../user/schemas/user.schema.js';
 import { LoginAttempt, LoginAttemptDocument } from '../session/schemas/login-attempt.schema.js';
 import { Session, SessionDocument } from '../session/schemas/session.schema.js';
+import { AnalyticsSummary, AnalyticsSummaryDocument } from './schemas/analytics-summary.schema.js';
 
 @Injectable()
 export class AnalyticsService {
+    private readonly logger = new Logger(AnalyticsService.name);
+
     constructor(
         @InjectModel(User.name) private userModel: Model<UserDocument>,
         @InjectModel(LoginAttempt.name) private loginAttemptModel: Model<LoginAttemptDocument>,
         @InjectModel(Session.name) private sessionModel: Model<SessionDocument>,
+        @InjectModel(AnalyticsSummary.name) private summaryModel: Model<AnalyticsSummaryDocument>,
     ) {}
 
     // ── Total Users Count ────────────────────────────────────
@@ -178,7 +183,6 @@ export class AnalyticsService {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Cumulative user growth
         const dailyNew = await this.userModel.aggregate([
             { $match: { created_at: { $gte: startDate } } },
             {
@@ -190,7 +194,6 @@ export class AnalyticsService {
             { $sort: { _id: 1 } },
         ]);
 
-        // Get total users before start date for cumulative count
         const baseCount = await this.userModel.countDocuments({
             created_at: { $lt: startDate },
         });
@@ -228,6 +231,102 @@ export class AnalyticsService {
             activity: activeUsers,
             status_breakdown: statusBreakdown,
             role_distribution: roleDistribution,
+        };
+    }
+
+    // ── Daily Data Aggregation ───────────────────────────────
+
+    @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+    async handleDailyAggregation() {
+        this.logger.log('Starting daily analytics aggregation...');
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dateStr = yesterday.toISOString().split('T')[0];
+
+        try {
+            const [overview, roleDistribution] = await Promise.all([
+                this.getDashboardOverview(),
+                this.getRoleDistribution(),
+            ]);
+
+            const loginStats = await this.loginAttemptModel.aggregate([
+                { $match: { created_at: { $gte: new Date(dateStr) } } },
+                { $group: { _id: '$success', count: { $sum: 1 } } }
+            ]);
+
+            const logins_success = loginStats.find(s => s._id === true)?.count || 0;
+            const logins_failed = loginStats.find(s => s._id === false)?.count || 0;
+
+            await this.summaryModel.updateOne(
+                { date: dateStr },
+                {
+                    $set: {
+                        users: overview.users,
+                        activity: {
+                            ...overview.activity,
+                            logins_success,
+                            logins_failed,
+                        },
+                        role_distribution: roleDistribution,
+                    },
+                },
+                { upsert: true }
+            );
+
+            this.logger.log(`Aggregated analytics for ${dateStr}`);
+        } catch (error) {
+            this.logger.error('Failed to aggregate analytics:', error);
+        }
+    }
+
+    // ── Summarized History for Large Ranges ──────────────────
+
+    async getSummarizedHistory(days: number = 365) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        const dateStr = startDate.toISOString().split('T')[0];
+
+        return this.summaryModel.find({ date: { $gte: dateStr } }).sort({ date: 1 }).lean();
+    }
+
+    // ── Linear Regression for Prediction ─────────────────────
+
+    async getChurnPrediction() {
+        const summaries = await this.summaryModel.find().sort({ date: -1 }).limit(14).lean();
+        if (summaries.length < 5) return { prediction: 'insufficient_data' };
+
+        const points = summaries.reverse().map((s, i) => ({ x: i, y: s.activity.active_24h }));
+        const n = points.length;
+        
+        const sumX = points.reduce((acc, p) => acc + p.x, 0);
+        const sumY = points.reduce((acc, p) => acc + p.y, 0);
+        const sumXY = points.reduce((acc, p) => acc + p.x * p.y, 0);
+        const sumXX = points.reduce((acc, p) => acc + p.x * p.x, 0);
+
+        const m = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+        const b = (sumY - m * sumX) / n;
+
+        const forecast: Array<{ day: number; predicted_active: number }> = [];
+        for (let i = n; i < n + 7; i++) {
+            forecast.push({
+                day: i - n + 1,
+                predicted_active: Math.max(0, Math.round(m * i + b)),
+            });
+        }
+
+        const currentActive = points[n - 1].y;
+        const forecastedActive = forecast[6].predicted_active;
+        const trend = m > 0 ? 'increasing' : m < 0 ? 'decreasing' : 'stable';
+        const churn_risk = m < -0.5 ? 'high' : m < 0 ? 'medium' : 'low';
+
+        return {
+            trend,
+            churn_risk,
+            slope: m,
+            intercept: b,
+            current_active: currentActive,
+            forecast_7d: forecastedActive,
+            full_forecast: forecast,
         };
     }
 }

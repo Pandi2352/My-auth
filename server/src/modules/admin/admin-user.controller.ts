@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminUserService } from './admin-user.service.js';
 import { AdminCreateUserDto } from './dto/admin-create-user.dto.js';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto.js';
@@ -18,6 +18,22 @@ export class AdminUserController {
     @Get()
     @Permissions('user:read')
     @ApiOperation({ summary: 'List all users (paginated, search, filter)' })
+    @ApiOkResponse({
+        description: 'Paginated user list with summary',
+        schema: {
+            example: {
+                success: true,
+                data: {
+                    items: [
+                        { _id: '65e7...', first_name: 'John', last_name: 'Doe', email: 'john@example.com', status: 'active', is_verified: true, created_at: '2026-03-30T10:00:00Z' }
+                    ],
+                    total: 1050,
+                    page: 1,
+                    limit: 10
+                }
+            }
+        }
+    })
     listUsers(@Query() query: ListUsersQueryDto) {
         return this.adminUserService.listUsers(query);
     }
@@ -39,6 +55,22 @@ export class AdminUserController {
     @Post()
     @Permissions('user:create')
     @ApiOperation({ summary: 'Create a new user (admin)' })
+    @ApiCreatedResponse({
+        description: 'User created successfully',
+        schema: {
+            example: {
+                success: true,
+                data: {
+                    _id: '65e7...',
+                    first_name: 'Jane',
+                    last_name: 'Smith',
+                    email: 'jane@example.com',
+                    status: 'active'
+                }
+            }
+        }
+    })
+    @ApiBadRequestResponse({ description: 'Invalid user data or email already exists' })
     createUser(@Body() dto: AdminCreateUserDto) {
         return this.adminUserService.createUser(dto);
     }
@@ -99,10 +131,33 @@ export class AdminUserController {
         return this.adminUserService.hardDelete(id);
     }
 
-    @Patch(':id/restore')
+    @Patch('restore/:id')
     @Permissions('user:update')
     @ApiOperation({ summary: 'Restore a soft-deleted user' })
     restoreUser(@Param('id') id: string) {
         return this.adminUserService.restoreUser(id);
+    }
+
+    // ── Bulk Operations ──────────────────────────────────────
+
+    @Patch('bulk/status')
+    @Permissions('user:update')
+    @ApiOperation({ summary: 'Bulk update user status' })
+    bulkUpdateStatus(@Body() dto: any) {
+        return this.adminUserService.bulkUpdateStatus(dto.user_ids, dto.status);
+    }
+
+    @Post('bulk/roles')
+    @Permissions('role:update')
+    @ApiOperation({ summary: 'Bulk assign roles to users' })
+    bulkAssignRoles(@Body() dto: any) {
+        return this.adminUserService.bulkAssignRoles(dto.user_ids, dto.role_ids);
+    }
+
+    @Delete('bulk')
+    @Permissions('user:delete')
+    @ApiOperation({ summary: 'Bulk delete users' })
+    bulkDelete(@Body() dto: { user_ids: string[]; soft?: boolean }) {
+        return this.adminUserService.bulkDelete(dto.user_ids, dto.soft);
     }
 }

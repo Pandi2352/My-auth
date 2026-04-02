@@ -27,17 +27,20 @@ const SENSITIVE_FIELDS = [
     'client_secret', 'client_id',
 ];
 
+import { AuditGateway } from './audit.gateway';
+
 @Injectable()
 export class AuditService {
     constructor(
         @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLogDocument>,
+        private readonly auditGateway: AuditGateway,
     ) {}
 
     // ── Create Log Entry ─────────────────────────────────────
 
     async log(data: CreateAuditLogDto): Promise<void> {
         try {
-            await this.auditLogModel.create({
+            const entry = await this.auditLogModel.create({
                 user_id: data.user_id ? new Types.ObjectId(data.user_id) : undefined,
                 user_email: data.user_email,
                 action: data.action,
@@ -52,6 +55,9 @@ export class AuditService {
                 ip_address: data.ip_address,
                 user_agent: data.user_agent,
             });
+
+            // Emit to WebSocket for real-time dashboard updates
+            this.auditGateway.emitAuditLog(entry.toObject());
         } catch (error) {
             // Audit logging should never break the request
             console.error('Failed to write audit log:', error);
@@ -98,15 +104,21 @@ export class AuditService {
 
     async exportLogs(query: AuditLogQueryDto, format: string = 'json') {
         const filter = this.buildFilter(query);
+        const selectedFields = query.fields ? query.fields.split(',') : null;
+
+        const projection: Record<string, any> = {};
+        if (selectedFields) {
+            selectedFields.forEach(f => projection[f.trim()] = 1);
+        }
 
         const logs = await this.auditLogModel
-            .find(filter)
+            .find(filter, projection)
             .sort({ created_at: -1 })
             .limit(10000) // Cap export at 10k records
             .lean();
 
         if (format === 'csv') {
-            return this.toCsv(logs);
+            return this.toCsv(logs, selectedFields);
         }
 
         return {
@@ -191,10 +203,10 @@ export class AuditService {
         return result;
     }
 
-    private toCsv(logs: any[]): string {
+    private toCsv(logs: any[], selectedFields?: string[] | null): string {
         if (logs.length === 0) return '';
 
-        const headers = [
+        const headers = selectedFields || [
             'id', 'user_id', 'user_email', 'action', 'target_type',
             'target_id', 'description', 'method', 'endpoint',
             'status_code', 'ip_address', 'created_at',

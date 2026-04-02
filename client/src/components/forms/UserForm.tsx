@@ -16,6 +16,7 @@ const userSchema = z.object({
   status: z.enum(['active', 'inactive', 'pending', 'suspended']),
   roleIds: z.array(z.string()).min(1, 'Select at least one role'),
   password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
+  requiresPasswordChange: z.boolean().default(false),
 });
 
 export type UserFormValues = z.infer<typeof userSchema>;
@@ -28,6 +29,7 @@ interface UserFormProps {
     phone?: string;
     status?: string;
     roleIds?: string[];
+    requiresPasswordChange?: boolean;
   };
   onSubmit: (values: UserFormValues) => void | Promise<void>;
   isLoading?: boolean;
@@ -54,7 +56,7 @@ export function UserForm({ initialData, onSubmit, isLoading, isEdit }: UserFormP
     handleSubmit,
     formState: { errors },
   } = useForm<UserFormValues>({
-    resolver: zodResolver(userSchema),
+    resolver: zodResolver(userSchema) as any,
     defaultValues: {
       firstName: initialData?.firstName ?? '',
       lastName: initialData?.lastName ?? '',
@@ -63,6 +65,7 @@ export function UserForm({ initialData, onSubmit, isLoading, isEdit }: UserFormP
       status: (initialData?.status as any) ?? 'active',
       roleIds: initialData?.roleIds ?? [],
       password: '',
+      requiresPasswordChange: initialData?.requiresPasswordChange ?? false,
     },
   });
 
@@ -135,6 +138,20 @@ export function UserForm({ initialData, onSubmit, isLoading, isEdit }: UserFormP
           )}
         </div>
       )}
+
+      <div className="py-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary bg-background"
+            {...register('requiresPasswordChange')}
+          />
+          <span>Require password change on next login</span>
+        </label>
+        <p className="mt-1 text-xs text-muted-foreground ml-6">
+          The user will be redirected to set a new password upon their first login.
+        </p>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

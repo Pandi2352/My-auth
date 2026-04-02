@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import {
+import { 
+  Fingerprint,
   ShieldCheck,
   ShieldOff,
   Smartphone,
@@ -16,6 +17,10 @@ import {
   Activity,
   Copy,
   RefreshCcw,
+  Trash2,
+  Key,
+  Database,
+  Plus
 } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { usePagination } from '@/hooks/usePagination';
@@ -28,6 +33,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import api from '@/lib/api/client';
 import { AUTH, SESSIONS, SOCIAL } from '@/lib/api/endpoints';
 import { handleApiError } from '@/lib/api/handleError';
+import { startRegistration } from '@simplewebauthn/browser';
 
 // ── Types ───────────────────────────────────────────────────
 interface LinkedAccount {
@@ -60,6 +66,14 @@ interface SecurityEvent {
   created_at: string;
 }
 
+interface Authenticator {
+  credentialID: string;
+  credentialDeviceType: string;
+  credentialBackedUp: boolean;
+  transports?: string[];
+  counter: number;
+}
+
 export default function SecurityPage() {
   useDocumentTitle('Security');
 
@@ -68,12 +82,15 @@ export default function SecurityPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Security</h1>
         <p className="text-sm text-muted-foreground">
-          Manage two-factor authentication, linked accounts, and review security activity
+          Manage passkeys, two-factor authentication, and monitor security activity
         </p>
       </div>
 
-      <Tabs defaultValue="2fa" className="w-full">
+      <Tabs defaultValue="passkeys" className="w-full">
         <TabsList className="bg-muted/50 p-1">
+          <TabsTrigger value="passkeys" className="gap-2">
+            <Fingerprint className="h-4 w-4" /> Passkeys
+          </TabsTrigger>
           <TabsTrigger value="2fa" className="gap-2">
             <Smartphone className="h-4 w-4" /> Two-Factor Auth
           </TabsTrigger>
@@ -89,6 +106,9 @@ export default function SecurityPage() {
         </TabsList>
 
         <div className="mt-6">
+          <TabsContent value="passkeys">
+            <PasskeysSection />
+          </TabsContent>
           <TabsContent value="2fa">
             <TwoFactorSection />
           </TabsContent>
@@ -103,6 +123,171 @@ export default function SecurityPage() {
           </TabsContent>
         </div>
       </Tabs>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 0. Passkeys (WebAuthn)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function PasskeysSection() {
+  const [authenticators, setAuthenticators] = useState<Authenticator[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const fetchAuthenticators = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get('/auth/webauthn/authenticators');
+      setAuthenticators(res.data.data || []);
+    } catch (error) {
+      handleApiError(error, 'Failed to load passkeys');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await api.delete(`/auth/webauthn/authenticators/${deleteId}`);
+      toast.success('Passkey deleted');
+      setDeleteId(null);
+      fetchAuthenticators();
+    } catch (error) {
+      handleApiError(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuthenticators();
+  }, []);
+
+  const handleRegister = async () => {
+    setIsRegistering(true);
+    try {
+      // 1. Get options from server
+      const optionsRes = await api.get('/auth/webauthn/register/options');
+      const options = optionsRes.data.data;
+
+      // 2. Start browser ceremony
+      const attestationResponse = await startRegistration({ optionsJSON: options });
+
+      // 3. Verify on server
+      await api.post('/auth/webauthn/register/verify', attestationResponse);
+      
+      toast.success('Passkey registered successfully');
+      fetchAuthenticators();
+    } catch (error: any) {
+      if (error.name === 'NotAllowedError') {
+        toast.error('Registration timed out or cancelled');
+      } else {
+        handleApiError(error, 'Failed to register passkey');
+      }
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>Passkeys</CardTitle>
+            <CardDescription>
+              Hardware-backed authentication using biometric sensors or security keys
+            </CardDescription>
+          </div>
+          <Button onClick={handleRegister} isLoading={isRegistering} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Passkey
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+          ) : authenticators.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Fingerprint className="h-6 w-6 text-muted-foreground/50" />
+              </div>
+              <div className="max-w-xs space-y-1">
+                <p className="text-sm font-medium text-foreground">No passkeys registered</p>
+                <p className="text-xs text-muted-foreground">
+                  Passkeys provide a more secure and convenient way to sign in without passwords
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {authenticators.map((auth) => (
+                <div
+                  key={auth.credentialID}
+                  className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-muted/30"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                      <Key className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {auth.credentialDeviceType === 'single_device' ? 'Platform Passkey' : 'Roaming Security Key'}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Database className="h-3 w-3" /> {auth.credentialID.substring(0, 12)}...
+                        </span>
+                        <span>•</span>
+                        {auth.credentialBackedUp ? (
+                          <span className="text-green-600 font-medium">Backed up</span>
+                        ) : (
+                          <span className="text-amber-600 font-medium">Not backed up</span>
+                        )}
+                        <span>•</span>
+                        <span>Used {auth.counter} times</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-red-600"
+                    onClick={() => setDeleteId(auth.credentialID)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Delete Passkey"
+        message="Are you sure you want to delete this passkey? You won't be able to use it to sign in anymore."
+        confirmLabel="Delete"
+        variant="danger"
+      />
+
+      <Card className="bg-primary/5 border-primary/20">
+        <CardContent className="pt-6">
+          <div className="flex gap-4">
+            <ShieldCheck className="h-6 w-6 text-primary shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-primary">Phishing Resistant</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Passkeys are resistant to phishing, as they can only be used with the specific website they were created for. 
+                Your biometric data never leaves your device.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
